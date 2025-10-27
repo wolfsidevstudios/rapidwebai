@@ -13,12 +13,14 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Gemini API -->
     <script type="module">
-      try {
-        const { GoogleGenAI } = await import("https://esm.run/@google/genai");
-        window.GoogleGenAI = GoogleGenAI;
-      } catch (e) {
-        console.error("Failed to load GoogleGenAI:", e);
-      }
+      (async () => {
+        try {
+          const { GoogleGenAI } = await import("https://esm.run/@google/genai");
+          window.GoogleGenAI = GoogleGenAI;
+        } catch (e) {
+          console.error("Failed to load GoogleGenAI:", e);
+        }
+      })();
     </script>
   <script type="importmap">
 {
