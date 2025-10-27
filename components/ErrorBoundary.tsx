@@ -24,14 +24,14 @@ class ErrorBoundary extends Component<Props, State> {
   }
   
   // Reset error state if children change (e.g., code is fixed)
-  // FIX: Converted to an arrow function to ensure `this` context is correctly inferred by TypeScript.
+  // FIX: Converted to an arrow function to ensure `this` is correctly bound and has access to component props and state.
   componentDidUpdate = (prevProps: Props) => {
     if (prevProps.children !== this.props.children && this.state.hasError) {
       this.setState({ hasError: false, error: null });
     }
   }
 
-  // FIX: Converted to an arrow function to ensure `this` context is correctly inferred by TypeScript.
+  // FIX: Converted to an arrow function to ensure `this` is correctly bound and has access to component props and state.
   render = () => {
     if (this.state.hasError) {
       return (

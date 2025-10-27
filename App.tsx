@@ -1,154 +1,176 @@
+// FIX: Declare the global 'google' object provided by the Google Identity Services script to prevent TypeScript errors.
+declare const google: any;
+
 import React, { useState, useEffect, useCallback } from 'react';
-import ChatPanel from './components/ChatPanel';
-import EditorPreviewPanel from './components/EditorPreviewPanel';
 import HomePage from './components/HomePage';
 import Header from './components/Header';
-import useDebounce from './hooks/useDebounce';
 import { GoogleGenAI } from "@google/genai";
-
-const DEFAULT_CODE = `import React from 'react';
-
-const App = () => {
-  return (
-    <div className="flex flex-col gap-4 items-center justify-center h-full bg-gray-100 p-8 text-center">
-      <h1 className="text-5xl font-bold text-gray-800">
-        AI Code Assistant
-      </h1>
-      <p className="text-lg text-gray-600">
-        I'm ready to build! Tell me what you want to create or change.
-      </p>
-    </div>
-  );
-};
-
-export default App;
-`;
+import OnboardingModal from './components/OnboardingModal';
+import IntegrationsPage from './components/IntegrationsPage';
+import ProjectPage from './components/ProjectPage';
+import ProfilePage from './components/ProfilePage';
 
 export interface ChatMessage {
   role: 'user' | 'model';
   content: string;
 }
 
+export interface UserProfile {
+  name: string;
+  email: string;
+  picture: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  code: string;
+  chatHistory: ChatMessage[];
+  createdAt: number;
+}
+
+
 const App: React.FC = () => {
-  // FIX: Removed 'settings' state as API key is handled by environment variables.
-  const [appState, setAppState] = useState<'home' | 'editor'>('home');
-  const [code, setCode] = useState<string>(DEFAULT_CODE);
-  const [transpiledCode, setTranspiledCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const debouncedCode = useDebounce(code, 500);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [location, setLocation] = useState(window.location.pathname);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
 
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
-  const [isLoading, setIsLoading] = useState(false);
+  // --- Routing ---
+  useEffect(() => {
+    const handlePopState = () => setLocation(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
-  const transpileCode = useCallback((codeToTranspile: string) => {
-    try {
-      // @ts-ignore - Babel is loaded from a script tag
-      const result = Babel.transform(codeToTranspile, {
-        presets: ['env', 'react', 'typescript'],
-        filename: 'Component.tsx',
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setLocation(path);
+  };
+
+  // --- Auth & Data Persistence ---
+  useEffect(() => {
+    const storedUser = localStorage.getItem('google_user_profile');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      const userProjects = localStorage.getItem(`projects_${parsedUser.email}`);
+      setProjects(userProjects ? JSON.parse(userProjects) : []);
+    }
+
+    if (localStorage.getItem('hasCompletedOnboarding') !== 'true') {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const handleLoginSuccess = (credentialResponse: any) => {
+    const credential = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+    const profile: UserProfile = {
+      name: credential.name,
+      email: credential.email,
+      picture: credential.picture,
+    };
+    setUser(profile);
+    localStorage.setItem('google_user_profile', JSON.stringify(profile));
+    const userProjects = localStorage.getItem(`projects_${profile.email}`);
+    setProjects(userProjects ? JSON.parse(userProjects) : []);
+  };
+  
+  const handleLogout = () => {
+    setUser(null);
+    setProjects([]);
+    localStorage.removeItem('google_user_profile');
+    google.accounts.id.disableAutoSelect();
+    navigate('/');
+  }
+
+  useEffect(() => {
+    // @ts-ignore
+    if (window.google) {
+      // @ts-ignore
+      google.accounts.id.initialize({
+        client_id: '127898517822-s1n15vk32sac7a28na4tdp68j21kjula.apps.googleusercontent.com',
+        callback: handleLoginSuccess,
       });
-      setTranspiledCode(result.code);
-      setError(null);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown transpilation error occurred.');
-      }
-      setTranspiledCode(null);
     }
   }, []);
   
   useEffect(() => {
-    transpileCode(debouncedCode);
-  }, [debouncedCode, transpileCode]);
-
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
-    setIsLoading(true);
-    setChatHistory(prev => [...prev, { role: 'user', content: message }]);
-
-    try {
-      // FIX: Initialize GoogleGenAI with API_KEY from environment variables as per guidelines.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      const fullPrompt = `You are an expert React developer specializing in modifying existing React components.
-You will be given the current code for a single functional component and a user request for changes.
-Your task is to apply the requested changes to the code and return the complete, updated code for the component.
-Preserve the existing logic and structure as much as possible, only making the necessary modifications.
-Return only the raw code for the component. Do not add any explanations, introductions, or markdown formatting like \`\`\`jsx.
-The component must remain a default export and include all necessary React imports.
-
-Current code:
----
-${code}
----
-User request: "${message}"
----
-New, modified code:`;
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
-        contents: fullPrompt
-      });
-
-      let newCode = response.text;
-      newCode = newCode.replace(/```(jsx|tsx)?\n?([\s\S]*?)\n?```/g, '$2').trim();
-
-      if (newCode) {
-        setCode(newCode);
-        setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the code. You can see the result in the preview." }]);
-        setActiveView('preview');
-      } else {
-        throw new Error("Received an empty response from the AI.");
-      }
-    } catch (err: unknown) {
-      console.error(err);
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-      setChatHistory(prev => [...prev, { role: 'model', content: `Sorry, I ran into an error: ${errorMessage}` }]);
-    } finally {
-      setIsLoading(false);
+    if (user?.email) {
+      localStorage.setItem(`projects_${user.email}`, JSON.stringify(projects));
     }
-  };
-  
-  const handleStartFromHome = (initialPrompt: string) => {
-    setAppState('editor');
-    handleSendMessage(initialPrompt);
-  };
-  
-  // FIX: Removed 'settings' navigation logic as the page is no longer used.
-  const handleNavigate = (page: 'about' | 'integrations') => {
-    // Placeholder for other pages
+  }, [projects, user]);
+
+  // --- Onboarding ---
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('hasCompletedOnboarding', 'true');
+    setShowOnboarding(false);
   };
 
-  if (appState === 'home') {
-    return <HomePage onStart={handleStartFromHome} onNavigate={handleNavigate} />;
+  // --- Project Management ---
+  const handleCreateNewProject = (prompt: string) => {
+    if (!user) {
+        // You could show a "please log in" message here
+        alert("Please log in to create a project.");
+        // @ts-ignore
+        if(window.google) {
+           // @ts-ignore
+           google.accounts.id.prompt();
+        }
+        return;
+    }
+    const newProject: Project = {
+        id: `proj-${Date.now()}`,
+        name: prompt.substring(0, 50) || 'New Project',
+        code: `import React from 'react';\n\nconst App = () => {\n  return (\n    <div className="flex items-center justify-center h-full bg-gray-100 p-4">\n      <p className="text-gray-500">Generating your component...</p>\n    </div>\n  );\n};\n\nexport default App;`,
+        chatHistory: [],
+        createdAt: Date.now(),
+    };
+    setProjects(prev => [...prev, newProject]);
+    navigate(`/app/${newProject.id}`);
+    
+    // We need a slight delay to ensure the state update has propagated before sending the message
+    setTimeout(() => {
+        // This is a bit of a trick: we can't directly call handleSendMessage from ProjectPage
+        // so we dispatch a custom event that ProjectPage will listen for.
+        window.dispatchEvent(new CustomEvent('startProjectWithMessage', { detail: { projectId: newProject.id, message: prompt } }));
+    }, 100);
+  };
+
+  const updateProject = (updatedProject: Project) => {
+    setProjects(prevProjects => prevProjects.map(p => p.id === updatedProject.id ? updatedProject : p));
   }
 
+  // --- Render Logic ---
+  const renderPage = () => {
+    if (location === '/') {
+      return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} />;
+    }
+    if (location === '/integrations') {
+      return <IntegrationsPage onBack={() => navigate('/')} />;
+    }
+    if (location === '/profile') {
+        return <ProfilePage user={user} projects={projects} onOpenProject={(id) => navigate(`/app/${id}`)} onLogout={handleLogout} />;
+    }
+
+    const projectMatch = location.match(/^\/app\/(proj-\d+)$/);
+    if (projectMatch) {
+      const projectId = projectMatch[1];
+      const project = projects.find(p => p.id === projectId);
+      if (!project) {
+        return <div className="h-screen w-screen flex items-center justify-center text-white bg-black">Project not found. <a href="/" className='underline ml-2'>Go home</a></div>;
+      }
+      return <ProjectPage project={project} onUpdateProject={updateProject} onNavigate={navigate} user={user} />;
+    }
+
+    return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} />;
+  };
+
   return (
-    <div className="relative h-screen w-screen bg-black">
-        <Header onNavigate={handleNavigate} />
-        <main className="flex h-full pt-16 text-white font-sans">
-            <div className="w-full md:w-2/5 lg:w-1/3 h-full">
-                <ChatPanel
-                chatHistory={chatHistory}
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                />
-            </div>
-            <div className="hidden md:block md:w-3/5 lg:w-2/3 h-full border-l border-white/10">
-                <EditorPreviewPanel
-                code={code}
-                onCodeChange={setCode}
-                transpiledCode={transpiledCode}
-                error={error}
-                activeView={activeView}
-                onViewChange={setActiveView}
-                />
-            </div>
-        </main>
-    </div>
+    <>
+      {renderPage()}
+      {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
+    </>
   );
 };
 

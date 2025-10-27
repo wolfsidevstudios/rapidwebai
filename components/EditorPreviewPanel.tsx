@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
+import PublishModal from './PublishModal';
 
 interface EditorPreviewPanelProps {
   code: string;
@@ -9,6 +10,7 @@ interface EditorPreviewPanelProps {
   error: string | null;
   activeView: 'code' | 'preview';
   onViewChange: (view: 'code' | 'preview') => void;
+  projectId: string;
 }
 
 const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
@@ -18,10 +20,14 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
   error,
   activeView,
   onViewChange,
+  projectId,
 }) => {
+  const [isPublishing, setIsPublishing] = useState(false);
+
   return (
     <div className="h-full flex flex-col relative bg-[#1e1e1e]">
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+      {isPublishing && <PublishModal projectId={projectId} onClose={() => setIsPublishing(false)} />}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center space-x-2">
         <div className="flex space-x-1 bg-black/30 backdrop-blur-md p-1 rounded-full border border-white/10">
           <button
             onClick={() => onViewChange('preview')}
@@ -44,6 +50,12 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
             Code
           </button>
         </div>
+        <button 
+          onClick={() => setIsPublishing(true)}
+          className="px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-white text-black hover:bg-gray-200"
+        >
+          Publish
+        </button>
       </div>
         
       <div className="flex-grow h-full w-full overflow-hidden">
