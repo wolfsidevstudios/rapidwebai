@@ -24,15 +24,15 @@ class ErrorBoundary extends Component<Props, State> {
   }
   
   // Reset error state if children change (e.g., code is fixed)
-  // FIX: Converted to an arrow function to ensure `this` is correctly bound and has access to component props and state.
-  componentDidUpdate = (prevProps: Props) => {
+  // FIX: Converted from an arrow function to a standard class method. React correctly binds `this` for lifecycle methods, so an arrow function is not necessary and was causing type errors.
+  componentDidUpdate(prevProps: Props) {
     if (prevProps.children !== this.props.children && this.state.hasError) {
       this.setState({ hasError: false, error: null });
     }
   }
 
-  // FIX: Converted to an arrow function to ensure `this` is correctly bound and has access to component props and state.
-  render = () => {
+  // FIX: Converted from an arrow function to a standard class method. React correctly binds `this` for lifecycle methods, so an arrow function is not necessary and was causing type errors.
+  render() {
     if (this.state.hasError) {
       return (
         <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800">

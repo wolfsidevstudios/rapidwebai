@@ -9,14 +9,24 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onNavigate, user }) => {
 
   useEffect(() => {
-    // @ts-ignore
-    if (window.google && !user) {
+    if (user) {
+      return; // Don't render button if logged in
+    }
+    
+    const intervalId = setInterval(() => {
+      const buttonContainer = document.getElementById("google-login-button");
+      // @ts-ignore
+      if (window.google?.accounts?.id && buttonContainer) {
+        clearInterval(intervalId);
         // @ts-ignore
         google.accounts.id.renderButton(
-            document.getElementById("google-login-button"),
+            buttonContainer,
             { theme: "outline", size: "large", type: 'standard', text: 'signin_with', shape: 'pill' }
         );
-    }
+      }
+    }, 100);
+
+    return () => clearInterval(intervalId);
   }, [user]);
 
   return (

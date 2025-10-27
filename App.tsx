@@ -63,7 +63,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLoginSuccess = (credentialResponse: any) => {
+  const handleLoginSuccess = useCallback((credentialResponse: any) => {
     const credential = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
     const profile: UserProfile = {
       name: credential.name,
@@ -74,7 +74,7 @@ const App: React.FC = () => {
     localStorage.setItem('google_user_profile', JSON.stringify(profile));
     const userProjects = localStorage.getItem(`projects_${profile.email}`);
     setProjects(userProjects ? JSON.parse(userProjects) : []);
-  };
+  }, []);
   
   const handleLogout = () => {
     setUser(null);
@@ -85,15 +85,18 @@ const App: React.FC = () => {
   }
 
   useEffect(() => {
-    // @ts-ignore
-    if (window.google) {
-      // @ts-ignore
-      google.accounts.id.initialize({
-        client_id: '127898517822-s1n15vk32sac7a28na4tdp68j21kjula.apps.googleusercontent.com',
-        callback: handleLoginSuccess,
-      });
-    }
-  }, []);
+    const intervalId = setInterval(() => {
+      if (google?.accounts?.id) {
+        clearInterval(intervalId);
+        google.accounts.id.initialize({
+          client_id: '127898517822-s1n15vk32sac7a28na4tdp68j21kjula.apps.googleusercontent.com',
+          callback: handleLoginSuccess,
+        });
+      }
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, [handleLoginSuccess]);
   
   useEffect(() => {
     if (user?.email) {
