@@ -12,7 +12,7 @@ const UpArrowIcon = () => (
 
 interface HomePageProps {
   onStart: (prompt: string) => void;
-  // FIX: Removed 'settings' from navigation options.
+  // FIX: Removed 'settings' from navigation options to match Header component.
   onNavigate: (page: 'about' | 'integrations') => void;
 }
 

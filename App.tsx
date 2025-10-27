@@ -30,7 +30,7 @@ export interface ChatMessage {
 }
 
 const App: React.FC = () => {
-  // FIX: Removed 'settings' from app states as API key management UI is not allowed.
+  // FIX: Removed 'settings' state as API key is handled by environment variables.
   const [appState, setAppState] = useState<'home' | 'editor'>('home');
   const [code, setCode] = useState<string>(DEFAULT_CODE);
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null);
@@ -70,7 +70,7 @@ const App: React.FC = () => {
     setChatHistory(prev => [...prev, { role: 'user', content: message }]);
 
     try {
-      // FIX: API key must be from process.env.API_KEY per guidelines.
+      // FIX: Initialize GoogleGenAI with API_KEY from environment variables as per guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const fullPrompt = `You are an expert React developer specializing in modifying existing React components.
@@ -117,7 +117,7 @@ New, modified code:`;
     handleSendMessage(initialPrompt);
   };
   
-  // FIX: Removed 'settings' navigation as the settings page for API keys is not permitted.
+  // FIX: Removed 'settings' navigation logic as the page is no longer used.
   const handleNavigate = (page: 'about' | 'integrations') => {
     // Placeholder for other pages
   };

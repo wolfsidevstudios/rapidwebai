@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface HeaderProps {
-  // FIX: Removed 'settings' from navigation options.
+  // FIX: Removed 'settings' from navigation options as it is no longer used.
   onNavigate: (page: 'about' | 'integrations') => void;
 }
 
