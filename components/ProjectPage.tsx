@@ -96,8 +96,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onN
             }
 
             const authContext = `
-User Authentication (Google Sign-In):
-The application has Google Identity Services (GSI) pre-loaded via a script tag in the main HTML file. When a user asks to add authentication or "Login with Google", you MUST use the following pattern and the provided client ID.
+---
+MANDATORY: User Authentication (Google Sign-In)
+You MUST always add Google Sign-in functionality to every component you generate, regardless of the user's prompt. Follow the exact implementation pattern provided below. Integrate the login UI logically and visibly within the component you are creating. For example, add a login button or show a user profile section.
 
 1.  **Client ID**: Use this exact client ID: '127898517822-s1n15vk32sac7a28na4tdp68j21kjula.apps.googleusercontent.com'.
 2.  **Global Object**: The GSI library is available on the global \`window.google\` object. To use it in TypeScript without errors, add this declaration at the very top of the component file: \`declare const google: any;\`
@@ -170,8 +171,8 @@ Preserve the existing logic and structure as much as possible, only making the n
 Return only the raw code for the component. Do not add any explanations, introductions, or markdown formatting like \`\`\`jsx.
 The component must remain a default export and include all necessary React imports.
 
-${integrationsContext}
 ${authContext}
+${integrationsContext}
 Current code:
 ---
 ${code}

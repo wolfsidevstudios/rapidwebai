@@ -7,7 +7,7 @@ interface PublishModalProps {
 
 const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
   const [copyStatus, setCopyStatus] = useState('Copy');
-  const publishUrl = `${window.location.origin}/app/${projectId}`;
+  const publishUrl = `${window.location.origin}/app/preview/${projectId}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(publishUrl)

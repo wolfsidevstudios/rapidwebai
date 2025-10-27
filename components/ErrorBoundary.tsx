@@ -24,14 +24,14 @@ class ErrorBoundary extends Component<Props, State> {
   }
   
   // Reset error state if children change (e.g., code is fixed)
-  // FIX: Switched to arrow functions for class methods. This ensures `this` is correctly bound to the component instance and can resolve TypeScript errors where `this.props` and `this.setState` are not recognized.
-  componentDidUpdate = (prevProps: Props) => {
+  // FIX: Changed lifecycle methods from arrow functions to standard class methods. This is the conventional way for React lifecycle methods and ensures TypeScript correctly infers `this` and its properties like `props` and `setState`.
+  componentDidUpdate(prevProps: Props) {
     if (prevProps.children !== this.props.children && this.state.hasError) {
       this.setState({ hasError: false, error: null });
     }
   }
 
-  render = () => {
+  render() {
     if (this.state.hasError) {
       return (
         <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800">

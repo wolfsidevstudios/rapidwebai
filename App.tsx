@@ -9,6 +9,7 @@ import OnboardingModal from './components/OnboardingModal';
 import IntegrationsPage from './components/IntegrationsPage';
 import ProjectPage from './components/ProjectPage';
 import ProfilePage from './components/ProfilePage';
+import PreviewPage from './components/PreviewPage'; // New import
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -154,6 +155,18 @@ const App: React.FC = () => {
     }
     if (location === '/profile') {
         return <ProfilePage user={user} projects={projects} onOpenProject={(id) => navigate(`/app/${id}`)} onLogout={handleLogout} />;
+    }
+
+    const previewMatch = location.match(/^\/app\/preview\/(proj-\d+)$/);
+    if (previewMatch) {
+      const projectId = previewMatch[1];
+      // This is a simulation. In a real app, you'd fetch the project from a server.
+      // Here, we can only find projects that the current user has in their local storage.
+      const project = projects.find(p => p.id === projectId); 
+      if (!project) {
+        return <div className="h-screen w-screen flex items-center justify-center text-center text-white bg-black p-4">Project not found.<br/> (This is a simulated public link. In a real app, this would fetch from a database.) <a href="/" className='underline ml-2'>Go home</a></div>;
+      }
+      return <PreviewPage project={project} />;
     }
 
     const projectMatch = location.match(/^\/app\/(proj-\d+)$/);
