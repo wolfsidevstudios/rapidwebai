@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import type { UserProfile } from '../App';
 
 interface HeaderProps {
@@ -8,26 +8,13 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onNavigate, user }) => {
 
-  useEffect(() => {
-    if (user) {
-      return; // Don't render button if logged in
-    }
-    
-    const intervalId = setInterval(() => {
-      const buttonContainer = document.getElementById("google-login-button");
-      // @ts-ignore
-      if (window.google?.accounts?.id && buttonContainer) {
-        clearInterval(intervalId);
+  const handleLoginClick = () => {
+    // @ts-ignore - 'google' is from the GSI script in index.html
+    if (window.google?.accounts?.id) {
         // @ts-ignore
-        google.accounts.id.renderButton(
-            buttonContainer,
-            { theme: "outline", size: "large", type: 'standard', text: 'signin_with', shape: 'pill' }
-        );
-      }
-    }, 100);
-
-    return () => clearInterval(intervalId);
-  }, [user]);
+        google.accounts.id.prompt();
+    }
+  };
 
   return (
     <header className="absolute top-0 left-0 right-0 z-50 p-6 bg-transparent">
@@ -49,7 +36,12 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, user }) => {
               <span className="text-white text-sm font-medium">{user.name}</span>
             </div>
           ) : (
-            <div id="google-login-button"></div>
+            <button 
+              onClick={handleLoginClick} 
+              className="text-sm font-medium text-white/90 hover:text-white transition-colors px-3 py-2"
+            >
+              Login
+            </button>
           )}
         </div>
       </div>
