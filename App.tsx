@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel';
 import EditorPreviewPanel from './components/EditorPreviewPanel';
-import HomePage from './components/HomePage'; // Import the new HomePage component
+import HomePage from './components/HomePage';
+import Header from './components/Header';
 import useDebounce from './hooks/useDebounce';
-// FIX: Use a value import for GoogleGenAI instead of a type-only import, as per @google/genai guidelines.
 import { GoogleGenAI } from "@google/genai";
-
-// FIX: Removed global window declaration as GoogleGenAI is now imported directly.
 
 const DEFAULT_CODE = `import React from 'react';
 
@@ -32,7 +30,8 @@ export interface ChatMessage {
 }
 
 const App: React.FC = () => {
-  const [appState, setAppState] = useState<'home' | 'editor'>('home'); // New state for app view
+  // FIX: Removed 'settings' from app states as API key management UI is not allowed.
+  const [appState, setAppState] = useState<'home' | 'editor'>('home');
   const [code, setCode] = useState<string>(DEFAULT_CODE);
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +70,7 @@ const App: React.FC = () => {
     setChatHistory(prev => [...prev, { role: 'user', content: message }]);
 
     try {
-      // FIX: Instantiate GoogleGenAI directly from the import, as per @google/genai guidelines.
+      // FIX: API key must be from process.env.API_KEY per guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const fullPrompt = `You are an expert React developer specializing in modifying existing React components.
@@ -118,31 +117,38 @@ New, modified code:`;
     handleSendMessage(initialPrompt);
   };
   
+  // FIX: Removed 'settings' navigation as the settings page for API keys is not permitted.
+  const handleNavigate = (page: 'about' | 'integrations') => {
+    // Placeholder for other pages
+  };
+
   if (appState === 'home') {
-    return <HomePage onStart={handleStartFromHome} />;
+    return <HomePage onStart={handleStartFromHome} onNavigate={handleNavigate} />;
   }
 
-
   return (
-    <main className="flex h-screen bg-black text-white font-sans">
-      <div className="w-full md:w-2/5 lg:w-1/3 h-full">
-        <ChatPanel
-          chatHistory={chatHistory}
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-        />
-      </div>
-      <div className="hidden md:block md:w-3/5 lg:w-2/3 h-full border-l border-white/10">
-        <EditorPreviewPanel
-          code={code}
-          onCodeChange={setCode}
-          transpiledCode={transpiledCode}
-          error={error}
-          activeView={activeView}
-          onViewChange={setActiveView}
-        />
-      </div>
-    </main>
+    <div className="relative h-screen w-screen bg-black">
+        <Header onNavigate={handleNavigate} />
+        <main className="flex h-full pt-16 text-white font-sans">
+            <div className="w-full md:w-2/5 lg:w-1/3 h-full">
+                <ChatPanel
+                chatHistory={chatHistory}
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+                />
+            </div>
+            <div className="hidden md:block md:w-3/5 lg:w-2/3 h-full border-l border-white/10">
+                <EditorPreviewPanel
+                code={code}
+                onCodeChange={setCode}
+                transpiledCode={transpiledCode}
+                error={error}
+                activeView={activeView}
+                onViewChange={setActiveView}
+                />
+            </div>
+        </main>
+    </div>
   );
 };
 
