@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel';
 import EditorPreviewPanel from './components/EditorPreviewPanel';
+import HomePage from './components/HomePage'; // Import the new HomePage component
 import useDebounce from './hooks/useDebounce';
 // FIX: Use a value import for GoogleGenAI instead of a type-only import, as per @google/genai guidelines.
 import { GoogleGenAI } from "@google/genai";
@@ -31,6 +32,7 @@ export interface ChatMessage {
 }
 
 const App: React.FC = () => {
+  const [appState, setAppState] = useState<'home' | 'editor'>('home'); // New state for app view
   const [code, setCode] = useState<string>(DEFAULT_CODE);
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +112,15 @@ New, modified code:`;
       setIsLoading(false);
     }
   };
+  
+  const handleStartFromHome = (initialPrompt: string) => {
+    setAppState('editor');
+    handleSendMessage(initialPrompt);
+  };
+  
+  if (appState === 'home') {
+    return <HomePage onStart={handleStartFromHome} />;
+  }
 
 
   return (

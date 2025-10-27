@@ -24,15 +24,15 @@ class ErrorBoundary extends Component<Props, State> {
   }
   
   // Reset error state if children change (e.g., code is fixed)
-  // FIX: Converted arrow function to a standard class method to fix 'this' context issues with TypeScript.
-  componentDidUpdate(prevProps: Props) {
+  // FIX: Reverted to arrow function syntax to resolve 'this' context typing errors.
+  componentDidUpdate = (prevProps: Props) => {
     if (prevProps.children !== this.props.children && this.state.hasError) {
       this.setState({ hasError: false, error: null });
     }
   }
 
-  // FIX: Converted arrow function to a standard class method to fix 'this' context issues with TypeScript.
-  render() {
+  // FIX: Reverted to arrow function syntax to resolve 'this' context typing errors.
+  render = () => {
     if (this.state.hasError) {
       return (
         <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800">
