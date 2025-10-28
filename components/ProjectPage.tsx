@@ -32,6 +32,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [selectedApis, setSelectedApis] = useState<string[]>([]);
     
     // State and logic for editing project name
     const [isEditingName, setIsEditingName] = useState(false);
@@ -121,16 +122,20 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         const newHistory = [...chatHistory, { role: 'user', content: message }];
         setChatHistory(newHistory);
 
+        const currentSelectedApis = [...selectedApis];
+        setSelectedApis([]);
+
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
             let firebaseContext = '';
-            const firebaseConfigRaw = localStorage.getItem('integration_key_firebase');
-            if (firebaseConfigRaw) {
-                try {
-                    const firebaseConfig = JSON.parse(firebaseConfigRaw);
-                    if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-                        firebaseContext = `
+            if (currentSelectedApis.includes('firebase') || localStorage.getItem('integration_key_firebase')) {
+                const firebaseConfigRaw = localStorage.getItem('integration_key_firebase');
+                if (firebaseConfigRaw) {
+                    try {
+                        const firebaseConfig = JSON.parse(firebaseConfigRaw);
+                        if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+                            firebaseContext = `
 ---
 MANDATORY: Full-Stack App Generation with Firebase
 
@@ -187,8 +192,9 @@ You are no longer just a component builder. You are a full-stack application arc
     -   If the user does not request backend features, you can generate a simple, frontend-only component. Use your judgment. A "simple landing page" probably doesn't need a database. A "note-taking app" definitely does.
 ---
 `;
-                    }
-                } catch (e) { console.error("Could not parse firebase config", e); }
+                        }
+                    } catch (e) { console.error("Could not parse firebase config", e); }
+                }
             }
             
             const availableIntegrations = ['chatgpt', 'google-analytics', 'pexels'];
@@ -209,6 +215,19 @@ You are no longer just a component builder. You are a full-stack application arc
                 integrationsContext += '\n---\n';
             }
 
+            let selectedApisContext = '';
+            if (currentSelectedApis.length > 0) {
+                selectedApisContext = `
+---
+MANDATORY: API/Integration Usage
+
+The user has explicitly selected the following APIs/integrations to be used for this request: ${currentSelectedApis.join(', ')}.
+You MUST use these APIs to fulfill the user's request.
+- For public APIs (like PokéAPI, JSON Placeholder), you can assume they are available via standard fetch requests to their public endpoints. You should know their base URLs or look them up.
+- For private APIs or services requiring configuration (like Firebase, Pexels), you MUST use the API keys and configuration details provided in other parts of this system prompt.
+---
+`;
+            }
 
             const fullPrompt = `You are an expert full-stack React developer specializing in creating and modifying single-file React applications.
 You will be given the current code and a user request for changes.
@@ -217,6 +236,7 @@ Preserve existing logic and structure as much as possible, only making the neces
 Return only the raw code. Do not add any explanations, introductions, or markdown formatting like \`\`\`jsx.
 The component must remain a default export and include all necessary React imports.
 
+${selectedApisContext}
 ${firebaseContext}
 ${integrationsContext}
 Current code:
@@ -297,6 +317,8 @@ New, modified code:`;
                     chatHistory={chatHistory}
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
+                    selectedApis={selectedApis}
+                    onSelectedApisChange={setSelectedApis}
                     />
                 </div>
                 <div className="hidden md:block md:w-3/5 lg:w-2/3 h-full border-l border-white/10">

@@ -189,8 +189,8 @@ const App: React.FC = () => {
   }
 
   const isHomePage = location === '/';
-  // Sidebar is 88px wide with a 16px margin (m-4). Right edge is at 104px. Add 16px gap = 120px.
-  const mainContentLeftClass = isHomePage ? 'left-4' : 'left-[120px]';
+  // Sidebar is 72px wide with a 16px margin (m-4). Right edge is at 88px. Add 16px gap = 104px.
+  const mainContentLeftClass = isHomePage ? 'left-4' : 'left-[104px]';
 
   return (
     <>

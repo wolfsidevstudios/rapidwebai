@@ -9,7 +9,7 @@ interface State {
   error: Error | null;
 }
 
-// FIX: By extending `React.Component` directly, we ensure that the ErrorBoundary class correctly inherits properties like `props` and methods like `setState`, resolving the reported TypeScript errors on lines 29, 30, and 47.
+// FIX: By extending React.Component, the ErrorBoundary class correctly inherits component properties like `props` and methods like `setState`, resolving the TypeScript errors.
 class ErrorBoundary extends React.Component<Props, State> {
   state: State = {
     hasError: false,
