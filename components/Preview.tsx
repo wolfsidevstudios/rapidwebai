@@ -30,6 +30,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
         setStatus('transpiling');
         clearConsole();
 
+        // Transpile TSX to JS, keeping ES module syntax (import/export)
         const result = await window.Babel.transform(code, {
           presets: ['react', 'typescript'],
           filename: 'App.tsx',
@@ -61,16 +62,16 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
     return () => window.removeEventListener('message', handleMessage);
   }, [onConsoleMessage]);
   
-  // Use a backtick-friendly escape function for the code string
   const escapeCode = (codeStr: string) => {
     return codeStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
   };
   
+  // This is the new, module-based sandbox environment for the iframe.
   const srcDoc = `
     <html>
       <head>
         <style>
-          body { margin: 0; background-color: white; color: black; }
+          body { margin: 0; background-color: white; color: black; font-family: sans-serif; }
           #root { height: 100%; width: 100%; }
           .runtime-error-overlay {
             position: fixed; inset: 0; background-color: rgba(26, 26, 26, 0.95);
@@ -82,12 +83,18 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             font-family: system-ui, sans-serif; color: #ff8080;
           }
         </style>
+        <script type="importmap">
+        {
+          "imports": {
+            "react": "https://esm.run/react@18",
+            "react-dom/client": "https://esm.run/react-dom@18/client"
+          }
+        }
+        </script>
       </head>
       <body>
         <div id="root"></div>
-        <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-        <script>
+        <script type="module">
           // --- Console Interceptor ---
           const originalConsole = { ...window.console };
           const formatArgs = (args) => args.map(arg => arg instanceof Error ? arg.stack || arg.message : typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
@@ -110,30 +117,34 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
           window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
 
           // --- Code Execution ---
-          try {
-            const codeToRun = \`${escapeCode(transpiledCode)}\`;
-            if (codeToRun.trim()) {
-                const require = (name) => {
-                    if (name === 'react') return window.React;
-                    throw new Error(\`Cannot find module '\${name}'\`);
-                };
-                const exports = {};
-                const module = { exports };
-                
-                (function(module, exports, require) {
-                  ${transpiledCode}
-                })(module, exports, require);
+          (async () => {
+            try {
+              const codeToRun = \`${escapeCode(transpiledCode)}\`;
+              if (!codeToRun.trim()) return;
 
-                const App = module.exports.default;
-                if (typeof App !== 'function') {
-                    throw new Error("The code must export a default React component.");
-                }
-                const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(React.createElement(App));
+              // Use a blob URL to import the user's code as an ES module.
+              // This supports top-level imports from CDNs (like esm.run) inside the code.
+              const blob = new Blob([codeToRun], { type: 'text/javascript' });
+              const url = URL.createObjectURL(blob);
+              const module = await import(url);
+              URL.revokeObjectURL(url); // Clean up
+
+              const App = module.default;
+              if (typeof App !== 'function') {
+                  throw new Error("The code must export a default React component.");
+              }
+              
+              // Import React and ReactDOM to render the app.
+              const React = await import('react');
+              const { createRoot } = await import('react-dom/client');
+
+              const root = createRoot(document.getElementById('root'));
+              root.render(React.createElement(App));
+
+            } catch (error) {
+              handleError(error);
             }
-          } catch (error) {
-            handleError(error);
-          }
+          })();
         </script>
       </body>
     </html>
