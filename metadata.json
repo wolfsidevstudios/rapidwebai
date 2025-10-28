@@ -1,5 +1,5 @@
 {
-  "name": "React Live Previewer",
+  "name": "Ai app builder ",
   "description": "A powerful in-browser playground to write, transpile, and live-preview React components. Edit the TSX code in the editor and see your changes reflected instantly in the preview pane.",
   "requestFramePermissions": []
 }

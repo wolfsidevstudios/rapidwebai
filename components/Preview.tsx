@@ -57,15 +57,24 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             font-family: system-ui, sans-serif; color: #ff8080;
           }
         </style>
-        <!-- 1. Load Core Libraries -->
-        <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
-        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
+        <!-- 1. Load Babel for in-browser transpilation -->
         <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+        
+        <!-- 2. Import Map to resolve bare module specifiers -->
+        <script type="importmap">
+        {
+          "imports": {
+            "react": "https://esm.run/react@18",
+            "react-dom": "https://esm.run/react-dom@18",
+            "react-dom/client": "https://esm.run/react-dom@18/client"
+          }
+        }
+        <\/script>
       </head>
       <body>
         <div id="root"></div>
 
-        <script type="text/javascript">
+        <script type="module">
             // --- Console Interceptor ---
             const originalConsole = { ...window.console };
             const formatArgs = (args) => args.map(arg => {
@@ -97,32 +106,31 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             
             window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
             window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
+            
+            // Import React/ReactDOM for rendering. The import map will resolve them.
+            import React from 'react';
+            import ReactDOM from 'react-dom/client';
 
             try {
-                // --- Code Injection and Transpilation ---
+                // --- Code Injection, Transpilation, and Execution ---
                 const rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
 
                 if (rawCode.trim()) {
+                    // Transpile TSX to JS, keeping ES module syntax ('import'/'export').
                     const transpiledCode = Babel.transform(rawCode, {
-                        presets: ['react', 'typescript', ['env', { modules: 'commonjs' }]],
-                        filename: 'App.tsx' // For better error messages from Babel
+                        presets: ['react', 'typescript', ['env', { modules: false }]],
+                        filename: 'App.tsx' // For better error messages
                     }).code;
 
-                    // --- Execution ---
-                    // Shim 'require' to provide the global React/ReactDOM objects to the transpiled code.
-                    const require = (name) => {
-                        if (name === 'react') return window.React;
-                        if (name === 'react-dom/client') return window.ReactDOM;
-                        throw new Error(\`Cannot find module '\${name}'. Only 'react' and 'react-dom/client' are supported.\`);
-                    };
-
-                    const exports = {};
-                    const module = { exports };
+                    // Create a Blob and a URL for the transpiled code to use it in a dynamic import().
+                    const codeBlob = new Blob([transpiledCode], { type: 'text/javascript' });
+                    const codeUrl = URL.createObjectURL(codeBlob);
                     
-                    // Execute the transpiled code in a controlled scope to get the exported component.
-                    new Function('require', 'module', 'exports', transpiledCode)(require, module, exports);
+                    // Dynamically import the user's code as an ES module.
+                    // The browser handles resolving 'react', 'react-dom/client', and any CDN URLs.
+                    const { default: App } = await import(codeUrl);
                     
-                    const App = module.exports.default;
+                    URL.revokeObjectURL(codeUrl); // Clean up the Blob URL.
 
                     if (typeof App !== 'function' && !(App && typeof App.render === 'function')) {
                         throw new Error("The code must export a default React component.");
