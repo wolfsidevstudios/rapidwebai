@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
 import useDebounce from '../hooks/useDebounce';
+import GeneratingPreview, { Suggestion } from './GeneratingPreview';
 
 export interface ConsoleMessage {
     type: 'log' | 'warn' | 'error' | 'info' | 'debug';
@@ -12,6 +13,10 @@ export interface ConsoleMessage {
 interface EditorPreviewPanelProps {
   code: string;
   onCodeChange: (value: string) => void;
+  isGeneratingInitial: boolean;
+  suggestions: Suggestion[];
+  onAddToChat: (prompt: string) => void;
+  initialPrompt: string;
 }
 
 const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => {
@@ -39,7 +44,7 @@ const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => 
     );
 };
 
-const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeChange }) => {
+const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeChange, isGeneratingInitial, suggestions, onAddToChat, initialPrompt }) => {
   const [activeView, setActiveView] = useState<'preview' | 'code' | 'console'>('preview');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
   const debouncedCode = useDebounce(code, 500);
@@ -49,6 +54,13 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeCha
   }, []);
   
   const clearConsole = useCallback(() => setConsoleMessages([]), []);
+
+  const renderPreview = () => {
+    if (isGeneratingInitial) {
+      return <GeneratingPreview suggestions={suggestions} onAddToChat={onAddToChat} initialPrompt={initialPrompt} />;
+    }
+    return <Preview code={debouncedCode} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
+  };
 
   return (
     <div className="h-full flex flex-col relative bg-[#1e1e1e]">
@@ -76,7 +88,7 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeCha
         )}
         {activeView === 'preview' && (
             <div className="h-full w-full bg-white">
-              <Preview code={debouncedCode} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
+              {renderPreview()}
             </div>
         )}
         {activeView === 'console' && <ConsoleView messages={consoleMessages} />}

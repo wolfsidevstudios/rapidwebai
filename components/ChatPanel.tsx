@@ -8,6 +8,8 @@ interface ChatPanelProps {
   isLoading: boolean;
   selectedApis: string[];
   onSelectedApisChange: (apis: string[]) => void;
+  chatInput: string;
+  onChatInputChange: (value: string) => void;
 }
 
 const UpArrowIcon = () => (
@@ -38,11 +40,11 @@ const ApiPill: React.FC<{api: Integration, onRemove: () => void}> = ({ api, onRe
     </div>
 );
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoading, selectedApis, onSelectedApisChange }) => {
-  const [input, setInput] = useState('');
+const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoading, selectedApis, onSelectedApisChange, chatInput, onChatInputChange }) => {
   const [showApiMenu, setShowApiMenu] = useState(false);
   const [availableApis, setAvailableApis] = useState<Integration[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const configuredApis = integrations.filter(int => {
@@ -54,6 +56,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoa
     setAvailableApis(configuredApis);
   }, []);
 
+  // When chatInput is updated externally (e.g. by suggestion click), focus the textarea.
+  useEffect(() => {
+    if (chatInput) {
+        textAreaRef.current?.focus();
+    }
+  }, [chatInput]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -64,7 +73,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoa
     if (!selectedApis.includes(apiId)) {
         onSelectedApisChange([...selectedApis, apiId]);
     }
-    setInput(input.replace(/\/api$/, ''));
+    onChatInputChange(chatInput.replace(/\/api$/, ''));
     setShowApiMenu(false);
   };
   
@@ -79,14 +88,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoa
     } else if (showApiMenu) {
         setShowApiMenu(false);
     }
-    setInput(value);
+    onChatInputChange(value);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() && !isLoading) {
-      onSendMessage(input);
-      setInput('');
+    if (chatInput.trim() && !isLoading) {
+      onSendMessage(chatInput);
+      onChatInputChange('');
     }
   };
   
@@ -151,7 +160,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoa
                 )}
                 
                 <textarea
-                    value={input}
+                    ref={textAreaRef}
+                    value={chatInput}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     placeholder="e.g., 'Add a title that says Hello World' or type '/api'"
@@ -162,7 +172,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ chatHistory, onSendMessage, isLoa
                 <button
                     type="submit"
                     className="absolute bottom-4 right-4 w-12 h-12 bg-white rounded-full flex items-center justify-center transition-transform transform hover:scale-110 disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isLoading || !input.trim()}
+                    disabled={isLoading || !chatInput.trim()}
                     aria-label="Send message"
                 >
                     <UpArrowIcon />

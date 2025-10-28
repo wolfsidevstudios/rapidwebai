@@ -61,6 +61,11 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
     return () => window.removeEventListener('message', handleMessage);
   }, [onConsoleMessage]);
   
+  // Use a backtick-friendly escape function for the code string
+  const escapeCode = (codeStr: string) => {
+    return codeStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  };
+  
   const srcDoc = `
     <html>
       <head>
@@ -106,25 +111,26 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
 
           // --- Code Execution ---
           try {
-            const require = (name) => {
-                if (name === 'react') return window.React;
-                throw new Error(\`Cannot find module '\${name}'\`);
-            };
-            const exports = {};
-            const module = { exports };
-            
-            // This is a simplified CommonJS-style environment for the transpiled code.
-            (function(module, exports, require) {
-              ${transpiledCode}
-            })(module, exports, require);
+            const codeToRun = \`${escapeCode(transpiledCode)}\`;
+            if (codeToRun.trim()) {
+                const require = (name) => {
+                    if (name === 'react') return window.React;
+                    throw new Error(\`Cannot find module '\${name}'\`);
+                };
+                const exports = {};
+                const module = { exports };
+                
+                (function(module, exports, require) {
+                  ${transpiledCode}
+                })(module, exports, require);
 
-            const App = module.exports.default;
-            if (typeof App !== 'function') {
-                throw new Error("The code must export a default React component.");
+                const App = module.exports.default;
+                if (typeof App !== 'function') {
+                    throw new Error("The code must export a default React component.");
+                }
+                const root = ReactDOM.createRoot(document.getElementById('root'));
+                root.render(React.createElement(App));
             }
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(React.createElement(App));
-
           } catch (error) {
             handleError(error);
           }

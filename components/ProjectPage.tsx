@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './ChatPanel';
 import EditorPreviewPanel from './EditorPreviewPanel';
 import type { Project } from '../App';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import PublishModal from './PublishModal';
+import type { Suggestion } from './GeneratingPreview';
+
 
 const EditIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -28,6 +30,14 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [selectedApis, setSelectedApis] = useState<string[]>([]);
+    
+    // State for the new generating UI
+    const [isGeneratingInitial, setIsGeneratingInitial] = useState(false);
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [initialPrompt, setInitialPrompt] = useState('');
+
+    // Centralized chat input state
+    const [chatInput, setChatInput] = useState('');
     
     const [isEditingName, setIsEditingName] = useState(false);
     const [projectName, setProjectName] = useState(project.name);
@@ -77,18 +87,52 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         return () => window.removeEventListener('startProjectWithMessage', handleInitialMessage);
     }, [project.id]);
 
+    const getFeatureSuggestions = async (message: string) => {
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: `Based on the following app idea, suggest 3 creative features. For each feature, provide a short title (max 5 words), a one-sentence description, and a concise prompt that a user could give to an AI developer to implement it. App Idea: "${message}"`,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                title: { type: Type.STRING },
+                                description: { type: Type.STRING },
+                                prompt: { type: Type.STRING },
+                            },
+                            required: ["title", "description", "prompt"],
+                        },
+                    },
+                },
+            });
+            const suggestedFeatures = JSON.parse(response.text);
+            setSuggestions(suggestedFeatures);
+        } catch (error) {
+            console.error("Failed to fetch feature suggestions:", error);
+            // Don't show an error to the user, just fail gracefully
+            setSuggestions([]); 
+        }
+    };
+
     const handleSendMessage = async (message: string) => {
         if (!message.trim()) return;
         setIsLoading(true);
         const newHistory = [...chatHistory, { role: 'user', content: message }];
         setChatHistory(newHistory);
 
-        const currentSelectedApis = [...selectedApis];
-        setSelectedApis([]);
+        // Handle initial generation UI
+        if (chatHistory.length === 0) {
+            setInitialPrompt(message);
+            setIsGeneratingInitial(true);
+            getFeatureSuggestions(message); // Fire and forget
+        }
 
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            
             const fullPrompt = `You are an expert React developer AI. Your task is to modify a React application based on the user's request by generating a single, self-contained TSX file.
 
 **Instructions for the Response:**
@@ -96,14 +140,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 2.  **SELF-CONTAINED**: All components, logic, and styling must be included in this single file. Do NOT use local \`import\` statements (e.g., \`import MyComponent from './MyComponent'\`).
 3.  **STYLING**: Use inline styles (e.g., \`style={{ color: 'blue' }}\`) or include a \`<style>\` tag as a string within your main component.
 4.  **ROUTING**: To create multiple pages, use React state. Do not use libraries like 'react-router-dom'. Manage the current page in state and conditionally render components.
-    *Example:*
-    \`\`\`jsx
-    const [page, setPage] = useState('home');
-    const navigate = (newPage) => setPage(newPage);
-    // ... then render based on 'page' state.
-    \`\`\`
 5.  **EXTERNAL LIBRARIES**: If you need a third-party library (e.g., for charts or animations), import it from a CDN like 'esm.run' at the top of the file.
-    *Example:* \`import confetti from 'https://esm.run/canvas-confetti';\`
 6.  **ENTRY POINT**: The main component must be the default export. (e.g., \`export default App;\`)
 
 **Current Code:**
@@ -129,6 +166,7 @@ ${code}
             setChatHistory(prev => [...prev, { role: 'model', content: `Sorry, I ran into an error: ${errorMessage}` }]);
         } finally {
             setIsLoading(false);
+            setIsGeneratingInitial(false); // End the special generating UI state
         }
     };
 
@@ -155,12 +193,24 @@ ${code}
             
             <main className="flex flex-grow text-white min-h-0">
                 <div className="w-2/5 h-full border-r border-white/10">
-                    <ChatPanel chatHistory={chatHistory} onSendMessage={handleSendMessage} isLoading={isLoading} selectedApis={selectedApis} onSelectedApisChange={setSelectedApis} />
+                    <ChatPanel 
+                        chatHistory={chatHistory} 
+                        onSendMessage={handleSendMessage} 
+                        isLoading={isLoading} 
+                        selectedApis={selectedApis} 
+                        onSelectedApisChange={setSelectedApis}
+                        chatInput={chatInput}
+                        onChatInputChange={setChatInput}
+                    />
                 </div>
                 <div className="w-3/5 h-full">
                     <EditorPreviewPanel
                         code={code}
                         onCodeChange={setCode}
+                        isGeneratingInitial={isGeneratingInitial}
+                        suggestions={suggestions}
+                        onAddToChat={setChatInput}
+                        initialPrompt={initialPrompt}
                     />
                 </div>
             </main>
