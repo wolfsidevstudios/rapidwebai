@@ -76,10 +76,15 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
                 </div>
             </div>
         ) : (
-            <div className="h-full w-full p-4">
-              <div className="bg-white h-full w-full rounded-2xl overflow-hidden">
-                  <Preview code={bundledCode} />
-              </div>
+            <div className="h-full w-full bg-white">
+              {error ? (
+                <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800 font-mono">
+                    <h3 className="font-bold font-sans mb-2">Bundler Error</h3>
+                    <pre className="whitespace-pre-wrap">{error}</pre>
+                </div>
+              ) : (
+                 <Preview files={files} bundledCode={bundledCode} />
+              )}
             </div>
         )}
       </div>

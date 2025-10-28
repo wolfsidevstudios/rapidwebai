@@ -109,7 +109,7 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
 
     return (
         <div className="h-screen w-screen bg-white">
-            <Preview code={bundledCode} />
+            <Preview files={project.files} bundledCode={bundledCode} />
         </div>
     );
 };

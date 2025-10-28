@@ -1,98 +1,85 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import ErrorBoundary from './ErrorBoundary';
+import React from 'react';
 
 interface PreviewProps {
-  code: string | null;
+  files: Record<string, string>;
+  bundledCode: string | null;
 }
 
-const Preview: React.FC<PreviewProps> = ({ code }) => {
-  const [Component, setComponent] = useState<React.ComponentType | null>(null);
-  const [evaluationError, setEvaluationError] = useState<Error | null>(null);
+const Preview: React.FC<PreviewProps> = ({ files, bundledCode }) => {
+  const html = files['public/index.html'];
 
-  useEffect(() => {
-    if (!code) {
-      setComponent(null);
-      return;
-    }
-
-    try {
-      const exports: { default?: React.ComponentType } = {};
-      const module = { exports };
-      
-      const customRequire = (moduleName: string) => {
-        if (moduleName === 'react') {
-          // 'React' is available globally from the CDN script in index.html
-          // @ts-ignore
-          return React;
-        }
-        // @ts-ignore
-        if (window.firebase) {
-           // @ts-ignore
-          if (moduleName === 'firebase/app') return window.firebase.app;
-           // @ts-ignore
-          if (moduleName === 'firebase/auth') return window.firebase.auth;
-           // @ts-ignore
-          if (moduleName === 'firebase/firestore') return window.firebase.firestore;
-        }
-        throw new Error(`Cannot find module '${moduleName}'. External modules are not supported.`);
-      };
-      
-      // We are creating a sandboxed function where we can provide our own 'require', 'module', and 'exports'.
-      // This mimics a CommonJS environment to run the Babel-transpiled code.
-      // @ts-ignore
-      new Function('require', 'module', 'exports', code)(customRequire, module, exports);
-      
-      // Babel transpiles `export default Foo` to `exports.default = Foo` or `module.exports.default = Foo`
-      const exportedComponent = module.exports.default as React.ComponentType | undefined;
-      
-      if (exportedComponent && typeof exportedComponent === 'function') {
-        setComponent(() => exportedComponent); // Use functional update to store the component type
-        setEvaluationError(null);
-      } else {
-        throw new Error('No default export found. Make sure your component is the default export.');
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setEvaluationError(err);
-      } else {
-        setEvaluationError(new Error('An unknown evaluation error occurred.'));
-      }
-      setComponent(null);
-    }
-  }, [code]);
-
-  const RenderedComponent = useMemo(() => {
-    if (evaluationError) {
-      return (
-        <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800">
-          <h3 className="font-bold">Evaluation Error</h3>
-          <p>There was an error when trying to run your code.</p>
-          <pre className="mt-2 text-sm whitespace-pre-wrap bg-red-50 p-2 rounded">
-            {evaluationError.toString()}
-          </pre>
-        </div>
-      );
-    }
-
-    if (Component) {
-      return (
-        <ErrorBoundary>
-          <Component />
-        </ErrorBoundary>
-      );
-    }
-    
+  if (!html) {
+    return <div className="p-4 m-4 bg-red-100 text-red-800">Error: public/index.html not found in project files.</div>;
+  }
+  
+  if (!bundledCode) {
     return (
         <div className="flex items-center justify-center h-full text-gray-500">
-            Waiting for valid code...
+            Bundling project...
         </div>
     );
-  }, [Component, evaluationError]);
+  }
+
+  // Inject the bundled code and a robust error-handling script into the base HTML file.
+  const srcDoc = html.replace(
+    '<script type="module" src="../src/main.jsx"></script>',
+    `
+    <style>
+      /* Basic reset and styles for runtime errors to ensure they are visible */
+      body { margin: 0; font-family: sans-serif; }
+      .runtime-error-display {
+        padding: 1.5rem;
+        margin: 1rem;
+        background-color: #fff5f5;
+        border-left: 4px solid #f56565;
+        color: #c53030;
+        font-family: monospace;
+      }
+      .runtime-error-display h3 { margin-top: 0; font-weight: bold; font-family: sans-serif; }
+      .runtime-error-display pre { 
+        white-space: pre-wrap; 
+        word-break: break-all;
+        background-color: #fed7d7;
+        padding: 0.5rem;
+        border-radius: 4px;
+        color: #7f1d1d;
+      }
+    </style>
+    <script>
+      // Catch both runtime errors and unhandled promise rejections
+      const handleError = (error) => {
+        const message = error.message || 'An unknown error occurred.';
+        document.body.innerHTML = '<div class="runtime-error-display"><h3>Runtime Error</h3><pre>' + message + '</pre></div>';
+        console.error(error);
+      };
+
+      window.addEventListener('error', (event) => {
+        event.preventDefault();
+        handleError(event.error);
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        event.preventDefault();
+        handleError(event.reason);
+      });
+
+      // Execute the bundled code inside a try-catch block
+      try {
+        ${bundledCode}
+      } catch (err) {
+        handleError(err);
+      }
+    </script>
+    `
+  );
 
   return (
-    <div className="w-full h-full overflow-auto">
-        {RenderedComponent}
-    </div>
+    <iframe
+      title="Application Preview"
+      srcDoc={srcDoc}
+      className="w-full h-full border-0"
+      sandbox="allow-scripts allow-modals allow-forms"
+    />
   );
 };
 
