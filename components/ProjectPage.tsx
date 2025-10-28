@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './ChatPanel';
 import EditorPreviewPanel from './EditorPreviewPanel';
-import type { Project } from '../App';
+// FIX: Import ChatMessage type to correctly type the chatHistory state.
+import type { Project, ChatMessage } from '../App';
 import { GoogleGenAI, Type } from "@google/genai";
 import PublishModal from './PublishModal';
 import type { Suggestion } from './GeneratingPreview';
@@ -26,7 +27,8 @@ interface ProjectPageProps {
 
 const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) => {
     const [code, setCode] = useState(project.code);
-    const [chatHistory, setChatHistory] = useState(project.chatHistory);
+    // FIX: Explicitly type the chatHistory state to prevent type inference issues with the 'role' property.
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>(project.chatHistory);
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [selectedApis, setSelectedApis] = useState<string[]>([]);
