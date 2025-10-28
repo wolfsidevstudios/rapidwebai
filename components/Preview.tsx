@@ -1,8 +1,86 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ConsoleMessage } from './EditorPreviewPanel';
 
-// @ts-ignore - esbuild is loaded from a script tag in index.html
-const esbuild = window.esbuild;
+// The entire transpilation logic now lives inside this worker.
+const workerCode = `
+  // Load Babel Standalone into the worker's scope
+  self.importScripts('https://unpkg.com/@babel/standalone/babel.min.js');
+
+  // A helper function to resolve relative imports to absolute paths within our virtual file system.
+  // This is crucial for building the import map correctly.
+  const resolvePath = (path, importer, allFiles) => {
+    // It's a package (e.g., 'react'), not a relative path, so we leave it alone.
+    if (!path.startsWith('.')) { 
+      return path; 
+    }
+    
+    // Determine the directory of the file that is doing the import.
+    const importerDir = importer.substring(0, importer.lastIndexOf('/'));
+    
+    // Create an absolute path from the root of our virtual filesystem.
+    // We use the URL constructor for a robust way to handle '../' and './'.
+    const resolved = new URL(path, 'file:///' + importerDir + '/').pathname.substring(1);
+    
+    // Check for various file extensions and index files, just like a real module resolver.
+    const potentialPaths = [
+      resolved,
+      resolved + '.js', resolved + '.jsx', resolved + '.ts', resolved + '.tsx',
+      resolved + '/index.js', resolved + '/index.jsx', resolved + '/index.ts', resolved + '/index.tsx'
+    ];
+    
+    for (const p of potentialPaths) {
+      if (allFiles[p] !== undefined) {
+        // Return the resolved absolute path, ensuring it has a '.js' extension for transpiled files.
+        return '/' + p.replace(/\\.(tsx|jsx|ts)$/, '.js');
+      }
+    }
+    
+    // If we can't find the file, we'll let the transpilation fail with a clear error.
+    return path;
+  };
+
+  self.onmessage = (event) => {
+    const { files } = event.data;
+    try {
+      const transpiledFiles = {};
+      
+      for (const filename in files) {
+        const fileContent = files[filename];
+
+        // Pass CSS files through without transpilation.
+        if (filename.endsWith('.css')) {
+          transpiledFiles[filename] = fileContent;
+          continue;
+        }
+
+        // Transpile JS/TS/JSX/TSX files.
+        if (/\.(js|jsx|ts|tsx)$/.test(filename)) {
+          // 1. Rewrite relative imports to be absolute from the root.
+          const codeWithAbsoluteImports = fileContent.replace(/from\\s+['"](.*?)['"]/g, (match, path) => {
+            const resolved = resolvePath(path, filename, files);
+            return \`from "\${resolved}"\`;
+          });
+
+          // 2. Transpile the code from TSX/JSX to browser-compatible JavaScript.
+          const result = self.Babel.transform(codeWithAbsoluteImports, {
+            presets: ['react', 'typescript'],
+            filename: filename,
+            sourceMaps: 'inline', // Add source maps for better debugging
+          }).code;
+          
+          // 3. Rename the output file to have a .js extension.
+          const newFilename = filename.replace(/\.(tsx|jsx|ts)$/, '.js');
+          transpiledFiles[newFilename] = result;
+        }
+      }
+      // Send the completed files back to the main thread.
+      self.postMessage({ type: 'success', files: transpiledFiles });
+    } catch (error) {
+      // If Babel fails, send a detailed error message back.
+      self.postMessage({ type: 'error', error: error.message });
+    }
+  };
+`;
 
 interface PreviewProps {
   files: Record<string, string>;
@@ -11,258 +89,181 @@ interface PreviewProps {
 }
 
 const Preview: React.FC<PreviewProps> = ({ files, onConsoleMessage, clearConsole }) => {
-  const [bundledCode, setBundledCode] = useState<string | null>(null);
+  const [status, setStatus] = useState('initializing');
   const [error, setError] = useState<string | null>(null);
-  const [isEsbuildInitialized, setIsEsbuildInitialized] = useState(false);
+  const [srcDoc, setSrcDoc] = useState('');
+  const workerRef = useRef<Worker | null>(null);
+  const blobUrlsRef = useRef<string[]>([]);
+
+  // Initialize the Web Worker on component mount.
+  useEffect(() => {
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+    workerRef.current = worker;
+
+    worker.onmessage = (event) => {
+      const { type, files: transpiledFiles, error: transpileError } = event.data;
+
+      // Clean up old blob URLs to prevent memory leaks.
+      blobUrlsRef.current.forEach(URL.revokeObjectURL);
+      blobUrlsRef.current = [];
+
+      if (type === 'error') {
+        setError(transpileError);
+        setStatus('error');
+        onConsoleMessage({ type: 'error', message: transpileError, timestamp: new Date() });
+        return;
+      }
+      
+      const htmlFile = files['public/index.html'];
+      if (!htmlFile) {
+        setError('Error: public/index.html not found.');
+        setStatus('error');
+        return;
+      }
+
+      const blobUrls: Record<string, string> = {};
+      const cssLinks: string[] = [];
+      const importMap: { imports: Record<string, string> } = {
+        imports: {
+          'react': 'https://unpkg.com/react@18/umd/react.development.js',
+          'react-dom': 'https://unpkg.com/react-dom@18/umd/react-dom.development.js',
+          'react-dom/client': 'https://unpkg.com/react-dom@18/umd/react-dom.development.js',
+        },
+      };
+
+      for (const filename in transpiledFiles) {
+        const content = transpiledFiles[filename];
+        const mimeType = filename.endsWith('.css') ? 'text/css' : 'application/javascript';
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        blobUrls[filename] = url;
+        blobUrlsRef.current.push(url);
+
+        if (filename.endsWith('.css')) {
+          cssLinks.push(`<link rel="stylesheet" href="${url}">`);
+        } else if (filename.endsWith('.js')) {
+          importMap.imports['/' + filename] = url;
+        }
+      }
+
+      // The entry point for the browser's module loader.
+      const entryPoint = Object.keys(files).find(f => f.includes('main.jsx') || f.includes('main.tsx'));
+      if (!entryPoint) {
+         setError('Error: No entry point (src/main.jsx or src/main.tsx) found.');
+         setStatus('error');
+         return;
+      }
+      const entryPointJs = '/' + entryPoint.replace(/\.(tsx|jsx)$/, '.js');
+
+      const finalHtml = htmlFile
+        .replace('</head>', `${cssLinks.join('\n')}</head>`)
+        .replace(
+          /<script type="module".*?><\/script>/,
+          `
+          <script type="importmap">${JSON.stringify(importMap)}</script>
+          <script type="module" src="${entryPointJs}"></script>
+          `
+        );
+      
+      setSrcDoc(finalHtml);
+      setStatus('ready');
+      setError(null);
+    };
+
+    return () => {
+      worker.terminate();
+      blobUrlsRef.current.forEach(URL.revokeObjectURL);
+    };
+  }, []); // Run only once
+
+  // When project files change, send them to the worker for transpilation.
+  useEffect(() => {
+    if (Object.keys(files).length > 0 && workerRef.current) {
+      setStatus('transpiling');
+      clearConsole();
+      workerRef.current.postMessage({ files });
+    }
+  }, [files, clearConsole]);
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Set up console message listener for the iframe.
   useEffect(() => {
-    const initializeEsbuild = async () => {
-      if (isEsbuildInitialized || !esbuild) return;
-      try {
-        await esbuild.initialize({
-          wasmURL: 'https://unpkg.com/esbuild-wasm@0.21.4/esbuild.wasm',
-          worker: true,
-        });
-        setIsEsbuildInitialized(true);
-      } catch (e) {
-        console.error("Failed to initialize esbuild", e);
-        setError("Failed to initialize code bundler. Please refresh the page.");
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      const { type, level, message } = event.data;
+      if (type === 'console') {
+        onConsoleMessage({ type: level, message, timestamp: new Date() });
       }
     };
-    initializeEsbuild();
-  }, [isEsbuildInitialized]);
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onConsoleMessage]);
   
-  const fetchPlugin = {
-    name: 'fetch-plugin',
-    setup(build: any) {
-        // Cache for fetched packages
-        const packageCache: Record<string, { url: string, content: string }> = {};
-
-        // Handle bare imports (npm packages)
-        build.onResolve({ filter: /^[^./]/ }, async (args: any) => {
-            const res = await fetch(`https://unpkg.com/${args.path}?meta`);
-            const url = res.url.replace('?meta', '');
-            return { path: url, namespace: 'http-url' };
-        });
-        
-        // Handle relative imports from fetched packages
-        build.onResolve({ filter: /.*/, namespace: 'http-url' }, (args: any) => {
-            return {
-                path: new URL(args.path, args.importer).href,
-                namespace: 'http-url',
+  const iframeContent = `
+    <html>
+      <head>
+        <style>
+          body { margin: 0; }
+          .runtime-error-overlay {
+            position: fixed; inset: 0; background-color: rgba(26, 26, 26, 0.95);
+            color: #ff5555; font-family: 'SF Mono', Consolas, Menlo, monospace;
+            padding: 2rem; overflow: auto; line-height: 1.6; white-space: pre-wrap;
+          }
+          .runtime-error-overlay h3 {
+            font-size: 1.25rem; margin-bottom: 1rem;
+            font-family: system-ui, sans-serif; color: #ff8080;
+          }
+        </style>
+      </head>
+      <body>
+        ${srcDoc.replace('</body>', `
+          <script>
+            // --- Console Interceptor ---
+            const originalConsole = { ...window.console };
+            const formatArgs = (args) => args.map(arg => arg instanceof Error ? arg.stack || arg.message : typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
+            Object.keys(originalConsole).forEach(key => {
+              if (typeof originalConsole[key] === 'function') {
+                window.console[key] = (...args) => {
+                  window.parent.postMessage({ type: 'console', level: key, message: formatArgs(args) }, '*');
+                  originalConsole[key](...args);
+                };
+              }
+            });
+            
+            // --- Error Handling ---
+            const handleError = (error) => {
+              console.error(error);
+              document.body.innerHTML = '<div class="runtime-error-overlay"><h3>Runtime Error</h3>' + (error.stack || error.message) + '</div>';
             };
-        });
-        
-        // Load fetched packages from cache or network
-        build.onLoad({ filter: /.*/, namespace: 'http-url' }, async (args: any) => {
-            if (packageCache[args.path]) {
-                return { contents: packageCache[args.path].content };
-            }
-            const res = await fetch(args.path);
-            const content = await res.text();
-            packageCache[args.path] = { url: args.path, content };
-            return { contents: content };
-        });
-    },
-  };
-  
-  const inMemoryFileLoaderPlugin = (projectFiles: Record<string, string>) => ({
-    name: 'in-memory-file-loader',
-    setup(build: any) {
-      // 1. Intercept the entry point.
-      build.onResolve({ filter: /^src\/main\.jsx$/ }, (args: any) => {
-        return { path: args.path, namespace: 'in-memory' };
-      });
+            
+            window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
+            window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
+          </script>
+        </body>
+        `)}
+      </html>
+  `;
 
-      // 2. Intercept relative paths inside files that are already in the "in-memory" namespace.
-      build.onResolve({ filter: /^\.{1,2}\//, namespace: 'in-memory' }, (args: any) => {
-        const importerDir = args.importer.substring(0, args.importer.lastIndexOf('/'));
-        const resolvedPath = new URL(args.path, `file:///${importerDir}/`).pathname.substring(1);
-        
-        const potentialPaths = [
-            resolvedPath,
-            `${resolvedPath}.js`, `${resolvedPath}.jsx`,
-            `${resolvedPath}.ts`, `${resolvedPath}.tsx`,
-            `${resolvedPath}.css`,
-            `${resolvedPath}/index.js`, `${resolvedPath}/index.jsx`,
-            `${resolvedPath}/index.ts`, `${resolvedPath}/index.tsx`,
-        ];
-
-        for (const p of potentialPaths) {
-            if (projectFiles[p]) {
-                return { path: p, namespace: 'in-memory' };
-            }
-        }
-        
-        return { errors: [{ text: `File not found: '${args.path}' from '${args.importer}'` }] };
-      });
-      
-      // 3. Define how to load files from our "in-memory" namespace.
-      build.onLoad({ filter: /.*/, namespace: 'in-memory' }, (args: any) => {
-          const fileContent = projectFiles[args.path];
-          if (fileContent === undefined) {
-              return { errors: [{ text: `File not found: ${args.path}` }] };
-          }
-          
-          const extension = args.path.split('.').pop();
-          const loader = extension === 'css' ? 'css' : 'jsx';
-
-          return { 
-            contents: fileContent, 
-            loader, 
-            resolveDir: args.path.substring(0, args.path.lastIndexOf('/')) 
-          };
-      });
-    }
-  });
-
-
-  const bundleProject = useCallback(async (projectFiles: Record<string, string>) => {
-    if (!isEsbuildInitialized) return;
-    clearConsole();
-    setError(null);
-    setBundledCode(null);
-
-    try {
-      const result = await esbuild.build({
-        entryPoints: ['src/main.jsx'],
-        bundle: true,
-        write: false,
-        plugins: [
-          inMemoryFileLoaderPlugin(projectFiles),
-          fetchPlugin,
-        ],
-        define: { 'process.env.NODE_ENV': '"production"' },
-        jsxFactory: 'React.createElement',
-        jsxFragment: 'React.Fragment',
-      });
-      setBundledCode(result.outputFiles[0].text);
-      setError(null);
-    } catch (err: any) {
-      const errorMessage = err.message || 'An unknown error occurred during bundling.';
-      setError(errorMessage.split('\n').slice(0, 10).join('\n'));
-      setBundledCode(null);
-      onConsoleMessage({ type: 'error', message: errorMessage, timestamp: new Date() });
-    }
-  }, [isEsbuildInitialized, onConsoleMessage, clearConsole]);
-  
-
-  useEffect(() => {
-    if (files && isEsbuildInitialized) {
-      bundleProject(files);
-    }
-  }, [files, bundleProject, isEsbuildInitialized]);
-
-  const html = files['public/index.html'];
-
-  if (!html) {
-    return <div className="p-4 m-4 bg-red-100 text-red-800">Error: public/index.html not found.</div>;
-  }
-  
-  if (error) {
-     return (
-        <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800 font-mono">
-            <h3 className="font-bold font-sans mb-2">Bundler Error</h3>
-            <pre className="whitespace-pre-wrap">{error}</pre>
-        </div>
-      );
-  }
-  
-  if (!bundledCode) {
-    return <div className="flex items-center justify-center h-full text-gray-500">Bundling project...</div>;
+  if (status === 'error') {
+    return (
+      <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800 font-mono">
+        <h3 className="font-bold font-sans mb-2">Transpilation Error</h3>
+        <pre className="whitespace-pre-wrap">{error}</pre>
+      </div>
+    );
   }
 
-  const srcDoc = html.replace(
-    '<script type="module" src="../src/main.jsx"></script>',
-    `
-    <style>
-      body { margin: 0; }
-      .runtime-error-overlay {
-        position: fixed;
-        inset: 0;
-        background-color: rgba(26, 26, 26, 0.95);
-        color: #ff5555;
-        font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-        padding: 2rem;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: flex-start;
-        overflow: auto;
-        line-height: 1.6;
-        white-space: pre-wrap;
-      }
-      .runtime-error-overlay h3 {
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-        color: #ff8080;
-      }
-    </style>
-    <script>
-      // --- Console Interceptor ---
-      const originalConsole = { ...window.console };
-      const formatArgs = (args) => {
-        return args.map(arg => {
-          if (arg instanceof Error) { return arg.stack || arg.message; }
-          if (typeof arg === 'object' && arg !== null) {
-            try { return JSON.stringify(arg, null, 2); } catch (e) { return '[Unserializable Object]'; }
-          }
-          return String(arg);
-        }).join(' ');
-      };
-      Object.keys(originalConsole).forEach(key => {
-        if (typeof originalConsole[key] === 'function') {
-          window.console[key] = (...args) => {
-            window.parent.postMessage({ type: 'console', level: key, message: formatArgs(args) }, '*');
-            originalConsole[key](...args);
-          };
-        }
-      });
-      
-      // --- Error Handling ---
-      const handleError = (error) => {
-        console.error(error); // Log to our intercepted console
-        document.body.innerHTML = ''; // Clear the page
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'runtime-error-overlay';
-        errorDiv.innerHTML = '<h3>Runtime Error</h3>' + (error.stack || error.message);
-        document.body.appendChild(errorDiv);
-      };
-      
-      window.addEventListener('error', (event) => { 
-        event.preventDefault(); 
-        handleError(event.error); 
-      });
-
-      try {
-        ${bundledCode}
-      } catch (err) {
-        handleError(err);
-      }
-    </script>
-    `
-  );
-
-    useEffect(() => {
-        const handleMessage = (event) => {
-            if (event.source !== iframeRef.current?.contentWindow) return;
-            const { type, level, message } = event.data;
-            if (type === 'console') {
-                onConsoleMessage({ type: level, message, timestamp: new Date() });
-            }
-        };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, [onConsoleMessage]);
-
+  if (status !== 'ready') {
+    return <div className="flex items-center justify-center h-full text-gray-500">{status === 'initializing' ? 'Initializing transpiler...' : 'Transpiling code...'}</div>;
+  }
 
   return (
     <iframe
       ref={iframeRef}
       title="Application Preview"
-      srcDoc={srcDoc}
+      srcDoc={iframeContent}
       className="w-full h-full border-0"
       sandbox="allow-scripts allow-modals allow-forms"
     />

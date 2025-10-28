@@ -99,8 +99,8 @@ You MUST return your response as a single, valid JSON object that represents the
 3.  **To Add/Modify a File**: Set the key to the full file path (e.g., "src/components/NewComponent.jsx") and the value to the new string content of the file.
 4.  **To Delete a File**: Set the key to the full file path (e.g., "src/old-component.jsx") and the value to \`null\`.
 5.  **Best Practices**: Write clean, readable, and maintainable React code. Ensure all imports are correct. If a new dependency is needed, add it to \`package.json\`.
-6.  **Styling**: Use standard CSS in a single \`src/styles.css\` file. This file MUST be imported in \`src/main.jsx\`. Apply styles using standard \`className\` attributes.
-7.  **Assets (Images, Fonts)**: Do not use local image or font files. Instead, use absolute URLs to public assets.
+6.  **Styling**: For styling, create or modify CSS files (e.g., \`src/styles.css\`). These files will be automatically linked in the preview. **You MUST NOT import CSS files directly into any JavaScript or JSX files (e.g., \`import './styles.css'\` is forbidden).**
+7.  **Assets (Images, Fonts)**: Do not use local image or font files. Instead, use absolute URLs to public assets (e.g., from a CDN like unpkg or a service like imgur).
 
 **Current file structure (for your reference):**
 ---
