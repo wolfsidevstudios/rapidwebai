@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import type { ConsoleMessage } from './EditorPreviewPanel';
 
@@ -66,7 +67,16 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
           "imports": {
             "react": "https://esm.run/react@18",
             "react-dom": "https://esm.run/react-dom@18",
-            "react-dom/client": "https://esm.run/react-dom@18/client"
+            "react-dom/client": "https://esm.run/react-dom@18/client",
+            "framer-motion": "https://esm.run/framer-motion",
+            "d3": "https://esm.run/d3",
+            "chart.js": "https://esm.run/chart.js",
+            "react-chartjs-2": "https://esm.run/react-chartjs-2",
+            "axios": "https://esm.run/axios",
+            "clsx": "https://esm.run/clsx",
+            "lodash": "https://esm.run/lodash",
+            "date-fns": "https://esm.run/date-fns",
+            "canvas-confetti": "https://esm.run/canvas-confetti"
           }
         }
         <\/script>
