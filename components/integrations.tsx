@@ -40,6 +40,32 @@ export const JsonPlaceholderIcon = () => (
         <path fill="#3b82f6" d="M20 18h-4v-2h4v2M14 6h-4v2h4V6m6 6h-4v-2h4v2m-6 0h-4v2h4v-2m-6 6H4v-2h4v2m0-6H4v-2h4v2m0-6H4V6h4v2m6 0h-4v2h4V8M4 4h16v16H4V4m2-2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6Z"></path>
     </svg>
 );
+export const RestCountriesIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2h1a2 2 0 002-2v-1a2 2 0 012-2h1.945M7.75 4a9 9 0 0110.5 0M7.75 4a9 9 0 00-3.12 3.12M7.75 4a9 9 0 01-3.12 3.12m13.64 0A9 9 0 0116.25 4m-3.12 3.12A9 9 0 0016.25 4m-6.38 5.62A9 9 0 014 11m12.38 0a9 9 0 013.62-1.25M12 21a9 9 0 01-9-9h18a9 9 0 01-9 9z" />
+    </svg>
+);
+
+export const CocktailDbIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v13m0-13c0-2.21-1.79-4-4-4S4 5.79 4 8h8zm0 0c0-2.21 1.79-4 4-4s4 1.79 4 4h-8zm-8 13h16" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 16L5 16" />
+    </svg>
+);
+
+export const UniversitiesIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path d="M12 14l9-5-9-5-9 5 9 5z" />
+        <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 14v6m-6-3h12" />
+    </svg>
+);
+
+export const TmdbIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"></path>
+    </svg>
+);
 
 
 export type Integration = {
@@ -54,6 +80,10 @@ export const integrations: Integration[] = [
     { id: 'firebase', name: 'Firebase', description: 'Build full-stack apps with backend, auth, and a database.', icon: <FirebaseIcon />, type: 'config' },
     { id: 'pokeapi', name: 'PokéAPI', description: 'Access data for thousands of Pokémon.', type: 'public', icon: <PokeApiIcon /> },
     { id: 'jsonplaceholder', name: 'JSON Placeholder', description: 'Fake online REST API for testing and prototyping.', type: 'public', icon: <JsonPlaceholderIcon /> },
+    { id: 'cocktail-db', name: 'TheCocktailDB', description: 'Database of drinks and cocktails from around the world.', icon: <CocktailDbIcon />, type: 'public' },
+    { id: 'rest-countries', name: 'REST Countries', description: 'Get information about countries via a RESTful API.', icon: <RestCountriesIcon />, type: 'public' },
+    { id: 'universities-api', name: 'Universities List', description: 'Public API for university listings.', icon: <UniversitiesIcon />, type: 'public' },
+    { id: 'tmdb', name: 'The Movie Database (TMDB)', description: 'A community built movie and TV database.', icon: <TmdbIcon />, type: 'private'},
     { id: 'chatgpt', name: 'ChatGPT', description: 'A powerful language model for generating human-like text and engaging in conversations', icon: <ChatGptIcon />, type: 'private' },
     { id: 'google-analytics', name: 'Google Analytics', description: 'Web analytics service that tracks and reports website traffic and user behavior', icon: <GoogleAnalyticsIcon />, type: 'private' },
     { id: 'pexels', name: 'Pexels', description: 'Access a vast library of high-quality, free stock photos and videos', icon: <PexelsIcon />, type: 'private' },
