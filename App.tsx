@@ -3,13 +3,13 @@ declare const google: any;
 
 import React, { useState, useEffect, useCallback } from 'react';
 import HomePage from './components/HomePage';
-import Header from './components/Header';
 import { GoogleGenAI } from "@google/genai";
 import OnboardingModal from './components/OnboardingModal';
 import IntegrationsPage from './components/IntegrationsPage';
 import ProjectPage from './components/ProjectPage';
 import ProfilePage from './components/ProfilePage';
-import PreviewPage from './components/PreviewPage'; // New import
+import PreviewPage from './components/PreviewPage';
+import Sidebar from './components/Sidebar';
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -114,7 +114,6 @@ const App: React.FC = () => {
   // --- Project Management ---
   const handleCreateNewProject = (prompt: string) => {
     if (!user) {
-        // You could show a "please log in" message here
         alert("Please log in to create a project.");
         // @ts-ignore
         if(window.google) {
@@ -133,10 +132,7 @@ const App: React.FC = () => {
     setProjects(prev => [...prev, newProject]);
     navigate(`/app/${newProject.id}`);
     
-    // We need a slight delay to ensure the state update has propagated before sending the message
     setTimeout(() => {
-        // This is a bit of a trick: we can't directly call handleSendMessage from ProjectPage
-        // so we dispatch a custom event that ProjectPage will listen for.
         window.dispatchEvent(new CustomEvent('startProjectWithMessage', { detail: { projectId: newProject.id, message: prompt } }));
     }, 100);
   };
@@ -148,20 +144,18 @@ const App: React.FC = () => {
   // --- Render Logic ---
   const renderPage = () => {
     if (location === '/') {
-      return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} user={user} onLogout={handleLogout}/>;
+      return <HomePage onStart={handleCreateNewProject} />;
     }
     if (location === '/integrations') {
-      return <IntegrationsPage onNavigate={navigate} user={user} onLogout={handleLogout} />;
+      return <IntegrationsPage />;
     }
     if (location === '/profile') {
-        return <ProfilePage user={user} projects={projects} onOpenProject={(id) => navigate(`/app/${id}`)} onLogout={handleLogout} onNavigate={navigate} />;
+        return <ProfilePage user={user} projects={projects} onOpenProject={(id) => navigate(`/app/${id}`)} />;
     }
 
     const previewMatch = location.match(/^\/app\/preview\/(proj-\d+)$/);
     if (previewMatch) {
       const projectId = previewMatch[1];
-      // This is a simulation. In a real app, you'd fetch the project from a server.
-      // Here, we can only find projects that the current user has in their local storage.
       const project = projects.find(p => p.id === projectId); 
       if (!project) {
         return <div className="h-screen w-screen flex items-center justify-center text-center text-white bg-black p-4">Project not found.<br/> (This is a simulated public link. In a real app, this would fetch from a database.) <a href="/" className='underline ml-2'>Go home</a></div>;
@@ -176,14 +170,17 @@ const App: React.FC = () => {
       if (!project) {
         return <div className="h-screen w-screen flex items-center justify-center text-white bg-black">Project not found. <a href="/" className='underline ml-2'>Go home</a></div>;
       }
-      return <ProjectPage project={project} onUpdateProject={updateProject} onNavigate={navigate} user={user} onLogout={handleLogout} />;
+      return <ProjectPage project={project} onUpdateProject={updateProject} />;
     }
 
-    return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} user={user} onLogout={handleLogout} />;
+    return <HomePage onStart={handleCreateNewProject} />;
   };
+
+  const shouldShowSidebar = !location.startsWith('/app/preview/');
 
   return (
     <>
+      {shouldShowSidebar && <Sidebar user={user} onNavigate={navigate} onLogout={handleLogout} />}
       {renderPage()}
       {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
     </>

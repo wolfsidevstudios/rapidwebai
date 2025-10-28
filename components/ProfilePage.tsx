@@ -1,19 +1,16 @@
 import React from 'react';
-import Header from './Header';
 import type { UserProfile, Project } from '../App';
 
 interface ProfilePageProps {
     user: UserProfile | null;
     projects: Project[];
     onOpenProject: (id: string) => void;
-    onLogout: () => void;
-    onNavigate: (path: string) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, projects, onOpenProject, onLogout, onNavigate }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, projects, onOpenProject }) => {
     if (!user) {
         return (
-            <div className="h-screen w-screen bg-gray-900 flex items-center justify-center text-white">
+            <div className="h-screen w-screen bg-gray-900 flex items-center justify-center text-white pl-28">
                 <p>Loading profile...</p>
             </div>
         )
@@ -23,16 +20,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, projects, onOpenProject
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
-            <Header onNavigate={onNavigate} user={user} onLogout={onLogout} />
-            <div className="container mx-auto px-4 pt-24 pb-12 max-w-4xl">
+            <div className="container mx-auto px-4 pt-8 pb-12 max-w-4xl pl-28">
                 <div className="flex items-center space-x-6 border-b border-gray-700 pb-10 mb-10">
                     <img src={user.picture} alt={user.name} className="w-24 h-24 rounded-full" />
                     <div>
                         <h1 className="text-3xl font-bold">{user.name}</h1>
                         <p className="text-gray-400">{user.email}</p>
-                        <button onClick={onLogout} className="mt-4 px-4 py-2 text-sm bg-red-600/80 hover:bg-red-600 rounded-lg transition-colors">
-                            Logout
-                        </button>
                     </div>
                 </div>
                 

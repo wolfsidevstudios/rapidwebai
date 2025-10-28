@@ -1,21 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import Header from './Header';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './ChatPanel';
 import EditorPreviewPanel from './EditorPreviewPanel';
 import useDebounce from '../hooks/useDebounce';
-import type { Project, UserProfile } from '../App';
+import type { Project } from '../App';
 import { GoogleGenAI } from "@google/genai";
 import PublishModal from './PublishModal';
+
+const EditIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z" />
+    </svg>
+);
+
+const CheckIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+);
 
 interface ProjectPageProps {
     project: Project;
     onUpdateProject: (updatedProject: Project) => void;
-    onNavigate: (path: string) => void;
-    user: UserProfile | null;
-    onLogout: () => void;
 }
 
-const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onNavigate, user, onLogout }) => {
+const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) => {
     const [code, setCode] = useState(project.code);
     const [chatHistory, setChatHistory] = useState(project.chatHistory);
     const [transpiledCode, setTranspiledCode] = useState<string | null>(null);
@@ -24,6 +32,41 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onN
     const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    
+    // State and logic for editing project name
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [projectName, setProjectName] = useState(project.name);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setProjectName(project.name);
+    }, [project.name]);
+    
+    useEffect(() => {
+        if (isEditingName) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditingName]);
+
+    const handleNameUpdate = () => {
+        if (projectName.trim()) {
+            onUpdateProject({ ...project, name: projectName.trim() });
+        } else {
+            setProjectName(project.name); // Revert if empty
+        }
+        setIsEditingName(false);
+    };
+
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleNameUpdate();
+        } else if (e.key === 'Escape') {
+            setProjectName(project.name);
+            setIsEditingName(false);
+        }
+    };
+
 
     const transpileCode = useCallback((codeToTranspile: string) => {
         try {
@@ -32,7 +75,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onN
             presets: ['env', 'react', 'typescript'],
             filename: 'Component.tsx',
             plugins: [
-                // Ensure Babel transpiles ES modules to CommonJS for our custom 'require'
                 ["@babel/plugin-transform-modules-commonjs"]
             ]
         });
@@ -52,12 +94,10 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onN
         transpileCode(debouncedCode);
     }, [debouncedCode, transpileCode]);
     
-    // Auto-save whenever code or chat history changes
     useEffect(() => {
-        onUpdateProject({ ...project, code, chatHistory });
-    }, [code, chatHistory]);
+        onUpdateProject({ ...project, code, chatHistory, name: projectName });
+    }, [code, chatHistory, projectName]);
 
-    // Listen for the custom event from App.tsx to start the first message
     useEffect(() => {
         const handleInitialMessage = (event: CustomEvent) => {
             const { projectId, message } = event.detail;
@@ -84,7 +124,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onN
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
-            // --- Firebase Context ---
             let firebaseContext = '';
             const firebaseConfigRaw = localStorage.getItem('integration_key_firebase');
             if (firebaseConfigRaw) {
@@ -214,15 +253,44 @@ New, modified code:`;
 
 
     return (
-        <div className="h-screen w-screen bg-black font-sans">
-            <Header 
-                onNavigate={onNavigate} 
-                user={user} 
-                onLogout={onLogout}
-                project={project}
-                onUpdateProject={onUpdateProject}
-                onPublish={() => setIsPublishing(true)}
-            />
+        <div className="h-screen w-screen bg-black font-sans pl-28">
+            <header className="fixed top-0 left-28 right-0 z-40 bg-black/30 backdrop-blur-lg border-b border-white/10 text-white">
+                <div className="flex justify-between items-center p-4 h-16">
+                    <div className="flex items-center group">
+                        {isEditingName ? (
+                            <div className="flex items-center space-x-2">
+                                <input 
+                                    ref={inputRef}
+                                    type="text"
+                                    value={projectName}
+                                    onChange={(e) => setProjectName(e.target.value)}
+                                    onKeyDown={handleInputKeyDown}
+                                    onBlur={handleNameUpdate}
+                                    className="bg-white/10 text-white placeholder-white/50 border border-white/20 rounded-md px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button onClick={handleNameUpdate} className="p-1.5 bg-blue-600 rounded-md hover:bg-blue-500 transition-colors">
+                                    <CheckIcon />
+                                </button>
+                            </div>
+                        ) : (
+                            <div onClick={() => setIsEditingName(true)} className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-white/10 transition-colors">
+                                <h1 className="text-lg font-medium text-white/90">{projectName}</h1>
+                                <span className="opacity-0 group-hover:opacity-60 transition-opacity">
+                                    <EditIcon />
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <button 
+                        onClick={() => setIsPublishing(true)}
+                        className="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white text-black hover:bg-gray-200"
+                    >
+                        Publish
+                    </button>
+                </div>
+            </header>
+            
             <main className="flex h-full pt-16 text-white">
                 <div className="w-full md:w-2/5 lg:w-1/3 h-full">
                     <ChatPanel

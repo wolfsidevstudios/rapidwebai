@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from './Header';
-import type { UserProfile } from '../App';
-
 
 // --- Icon Components ---
 
@@ -48,13 +45,9 @@ const integrations = [
 const firebaseConfigFields = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
 
 
-interface IntegrationsPageProps {
-  onNavigate: (path: string) => void;
-  user: UserProfile | null;
-  onLogout: () => void;
-}
+interface IntegrationsPageProps {}
 
-const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, onLogout }) => {
+const IntegrationsPage: React.FC<IntegrationsPageProps> = () => {
   const [openIntegration, setOpenIntegration] = useState<string | null>('firebase');
   const [apiKeys, setApiKeys] = useState<{ [key: string]: string }>({});
   const [firebaseConfig, setFirebaseConfig] = useState<{ [key: string]: string }>({});
@@ -113,8 +106,7 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, o
   const toggleVisibility = (id: string) => setKeyVisibility(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 pt-24 font-sans">
-      <Header onNavigate={onNavigate} user={user} onLogout={onLogout} />
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 pt-8 pl-28 font-sans">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-900 mb-8">Integrations</h1>
         <div className="space-y-3">
