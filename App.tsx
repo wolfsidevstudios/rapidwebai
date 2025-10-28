@@ -148,13 +148,13 @@ const App: React.FC = () => {
   // --- Render Logic ---
   const renderPage = () => {
     if (location === '/') {
-      return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} />;
+      return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} user={user} onLogout={handleLogout}/>;
     }
     if (location === '/integrations') {
-      return <IntegrationsPage onBack={() => navigate('/')} />;
+      return <IntegrationsPage onNavigate={navigate} user={user} onLogout={handleLogout} />;
     }
     if (location === '/profile') {
-        return <ProfilePage user={user} projects={projects} onOpenProject={(id) => navigate(`/app/${id}`)} onLogout={handleLogout} />;
+        return <ProfilePage user={user} projects={projects} onOpenProject={(id) => navigate(`/app/${id}`)} onLogout={handleLogout} onNavigate={navigate} />;
     }
 
     const previewMatch = location.match(/^\/app\/preview\/(proj-\d+)$/);
@@ -176,10 +176,10 @@ const App: React.FC = () => {
       if (!project) {
         return <div className="h-screen w-screen flex items-center justify-center text-white bg-black">Project not found. <a href="/" className='underline ml-2'>Go home</a></div>;
       }
-      return <ProjectPage project={project} onUpdateProject={updateProject} onNavigate={navigate} user={user} />;
+      return <ProjectPage project={project} onUpdateProject={updateProject} onNavigate={navigate} user={user} onLogout={handleLogout} />;
     }
 
-    return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} />;
+    return <HomePage onStart={handleCreateNewProject} onNavigate={navigate} user={user} onLogout={handleLogout} />;
   };
 
   return (

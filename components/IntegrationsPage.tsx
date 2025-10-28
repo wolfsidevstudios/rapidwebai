@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import Header from './Header';
+import type { UserProfile } from '../App';
+
 
 // --- Icon Components ---
 
@@ -34,10 +37,12 @@ const integrations = [
 ];
 
 interface IntegrationsPageProps {
-  onBack: () => void;
+  onNavigate: (path: string) => void;
+  user: UserProfile | null;
+  onLogout: () => void;
 }
 
-const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onBack }) => {
+const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, onLogout }) => {
   const [openIntegration, setOpenIntegration] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<{ [key: string]: string }>({});
   const [keyVisibility, setKeyVisibility] = useState<{ [key: string]: boolean }>({});
@@ -78,9 +83,9 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onBack }) => {
   const toggleVisibility = (id: string) => setKeyVisibility(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-sans">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 pt-24 font-sans">
+      <Header onNavigate={onNavigate} user={user} onLogout={onLogout} />
       <div className="max-w-3xl mx-auto">
-        <button onClick={onBack} className="mb-6 text-sm text-gray-600 hover:text-black">&larr; Back to Home</button>
         <h1 className="text-4xl font-bold text-gray-900 mb-8">Integrations</h1>
         <div className="space-y-3">
           {integrations.map(int => (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Header from './Header'; // Import the new Header component
+import type { UserProfile } from '../App';
 
 const UpArrowIcon = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -13,9 +14,11 @@ const UpArrowIcon = () => (
 interface HomePageProps {
   onStart: (prompt: string) => void;
   onNavigate: (path: string) => void;
+  user: UserProfile | null;
+  onLogout: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ onStart, onNavigate }) => {
+const HomePage: React.FC<HomePageProps> = ({ onStart, onNavigate, user, onLogout }) => {
   const [prompt, setPrompt] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -37,7 +40,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, onNavigate }) => {
         className="relative h-screen w-screen bg-cover bg-center" 
         style={{ backgroundImage: "url('https://i.ibb.co/tTjwPg3Y/Google-AI-Studio-2025-10-27-T21-45-49-645-Z.png')" }}
     >
-      <Header onNavigate={onNavigate} />
+      <Header onNavigate={onNavigate} user={user} onLogout={onLogout} />
       <div className="flex flex-col items-center justify-center h-full w-full bg-black/10">
         <div className="text-center mb-12">
             <h1 className="text-6xl font-extrabold text-white" style={{textShadow: '0 4px 15px rgba(0,0,0,0.5)'}}>

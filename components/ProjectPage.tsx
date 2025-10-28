@@ -5,15 +5,17 @@ import EditorPreviewPanel from './EditorPreviewPanel';
 import useDebounce from '../hooks/useDebounce';
 import type { Project, UserProfile } from '../App';
 import { GoogleGenAI } from "@google/genai";
+import PublishModal from './PublishModal';
 
 interface ProjectPageProps {
     project: Project;
     onUpdateProject: (updatedProject: Project) => void;
     onNavigate: (path: string) => void;
     user: UserProfile | null;
+    onLogout: () => void;
 }
 
-const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onNavigate, user }) => {
+const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onNavigate, user, onLogout }) => {
     const [code, setCode] = useState(project.code);
     const [chatHistory, setChatHistory] = useState(project.chatHistory);
     const [transpiledCode, setTranspiledCode] = useState<string | null>(null);
@@ -21,6 +23,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject, onN
     const debouncedCode = useDebounce(code, 500);
     const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
     const [isLoading, setIsLoading] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     const transpileCode = useCallback((codeToTranspile: string) => {
         try {
@@ -207,9 +210,16 @@ New, modified code:`;
 
 
     return (
-        <div className="relative h-screen w-screen bg-black">
-            <Header onNavigate={onNavigate} user={user} />
-            <main className="flex h-full pt-16 text-white font-sans">
+        <div className="h-screen w-screen bg-black font-sans">
+            <Header 
+                onNavigate={onNavigate} 
+                user={user} 
+                onLogout={onLogout}
+                project={project}
+                onUpdateProject={onUpdateProject}
+                onPublish={() => setIsPublishing(true)}
+            />
+            <main className="flex h-full pt-16 text-white">
                 <div className="w-full md:w-2/5 lg:w-1/3 h-full">
                     <ChatPanel
                     chatHistory={chatHistory}
@@ -225,10 +235,10 @@ New, modified code:`;
                     error={error}
                     activeView={activeView}
                     onViewChange={setActiveView}
-                    projectId={project.id}
                     />
                 </div>
             </main>
+            {isPublishing && <PublishModal projectId={project.id} onClose={() => setIsPublishing(false)} />}
         </div>
     );
 };

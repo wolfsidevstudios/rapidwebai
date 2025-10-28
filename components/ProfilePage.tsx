@@ -1,4 +1,5 @@
 import React from 'react';
+import Header from './Header';
 import type { UserProfile, Project } from '../App';
 
 interface ProfilePageProps {
@@ -6,9 +7,10 @@ interface ProfilePageProps {
     projects: Project[];
     onOpenProject: (id: string) => void;
     onLogout: () => void;
+    onNavigate: (path: string) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, projects, onOpenProject, onLogout }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, projects, onOpenProject, onLogout, onNavigate }) => {
     if (!user) {
         return (
             <div className="h-screen w-screen bg-gray-900 flex items-center justify-center text-white">
@@ -21,7 +23,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, projects, onOpenProject
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
-            <div className="container mx-auto px-4 py-12 max-w-4xl">
+            <Header onNavigate={onNavigate} user={user} onLogout={onLogout} />
+            <div className="container mx-auto px-4 pt-24 pb-12 max-w-4xl">
                 <div className="flex items-center space-x-6 border-b border-gray-700 pb-10 mb-10">
                     <img src={user.picture} alt={user.name} className="w-24 h-24 rounded-full" />
                     <div>
