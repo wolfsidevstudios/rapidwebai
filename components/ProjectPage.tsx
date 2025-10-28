@@ -76,7 +76,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
             presets: ['env', 'react', 'typescript'],
             filename: 'Component.tsx',
             plugins: [
-                ["@babel/plugin-transform-modules-commonjs"]
+                "transform-modules-commonjs"
             ]
         });
         setTranspiledCode(result.code);

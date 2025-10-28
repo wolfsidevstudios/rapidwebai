@@ -16,6 +16,9 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
             const result = Babel.transform(codeToTranspile, {
                 presets: ['env', 'react', 'typescript'],
                 filename: 'Component.tsx',
+                plugins: [
+                    "transform-modules-commonjs"
+                ]
             });
             setTranspiledCode(result.code);
             setError(null);
