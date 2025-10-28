@@ -44,10 +44,10 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, onNavigate, user, onLogout
       <div className="flex flex-col items-center justify-center h-full w-full bg-black/10">
         <div className="text-center mb-12">
             <h1 className="text-6xl font-extrabold text-white" style={{textShadow: '0 4px 15px rgba(0,0,0,0.5)'}}>
-                Build with AI
+                Build Full-Stack Apps with AI
             </h1>
             <p className="text-xl text-white/90 mt-4" style={{textShadow: '0 2px 10px rgba(0,0,0,0.5)'}}>
-                Describe what you want to create, and watch it come to life.
+                Describe the web application you want to build, from a simple component to a full-stack solution.
             </p>
         </div>
         <form onSubmit={handleSubmit} className="relative w-full max-w-2xl px-4">
@@ -55,7 +55,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, onNavigate, user, onLogout
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="e.g., 'A vibrant login form with a subtle gradient background'"
+            placeholder="e.g., 'A real-time to-do list app with Google authentication'"
             className="w-full h-40 p-6 pr-20 text-xl bg-white text-gray-800 placeholder-gray-500 rounded-3xl shadow-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/60 resize-none transition-all"
             aria-label="Initial prompt input"
           />

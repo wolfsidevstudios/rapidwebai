@@ -25,6 +25,15 @@ const Preview: React.FC<PreviewProps> = ({ code }) => {
           // @ts-ignore
           return React;
         }
+        // @ts-ignore
+        if (window.firebase) {
+           // @ts-ignore
+          if (moduleName === 'firebase/app') return window.firebase.app;
+           // @ts-ignore
+          if (moduleName === 'firebase/auth') return window.firebase.auth;
+           // @ts-ignore
+          if (moduleName === 'firebase/firestore') return window.firebase.firestore;
+        }
         throw new Error(`Cannot find module '${moduleName}'. External modules are not supported.`);
       };
       

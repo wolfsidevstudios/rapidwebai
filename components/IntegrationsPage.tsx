@@ -5,6 +5,14 @@ import type { UserProfile } from '../App';
 
 // --- Icon Components ---
 
+const FirebaseIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-8 h-8">
+        <path fill="#FFCA28" d="M14.63,3.32L5.13,17.55L2,17.97L4.43,13.1L14.63,3.32z"/>
+        <path fill="#FFA000" d="M18.81,10.23L5.59,20.24L2,17.97L15.3,5.83L18.81,10.23z"/>
+        <path fill="#F57C00" d="M18.81,10.23L15.3,5.83C15.3,5.83 11.08,9.08 5.59,20.24L18.81,10.23z"/>
+        <path fill="#FFC107" d="M2.68,22L2,17.97L5.13,17.55L5.59,20.24L2.68,22z"/>
+    </svg>
+);
 const ChatGptIcon = () => (
     <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6">
         <path stroke="#00A67E" strokeWidth="8" d="M55.083 68.0001V47.8295C55.083 45.2386 56.5141 42.8596 58.803 41.6455L75.8077 32.6263C76.4756 32.2721 77.1852 32.0028 77.9199 31.8247V31.8247C91.132 28.6231 103.247 40.1201 100.741 53.4815L99.4308 60.464"></path><path stroke="#00A67E" strokeWidth="8" d="M55.6898 58.6917L73.2238 48.5685C75.4672 47.2732 78.2426 47.3228 80.4383 48.6975L96.9222 59.0174C97.4899 59.3728 98.0161 59.7905 98.4911 60.2628V60.2628C108.373 70.088 104.329 86.8903 91.0588 91.1435L85.4823 92.9308"></path><path stroke="#00A67E" strokeWidth="8" d="M65.0278 54.6897L82.5617 64.8129C84.8051 66.1081 86.1498 68.5365 86.0572 71.1253L85.3684 90.3777C85.3401 91.1679 85.2101 91.9512 84.9815 92.7082V92.7082C81.0209 105.824 64.9077 110.571 54.4688 101.698L49.9091 97.8221"></path><path stroke="#00A67E" strokeWidth="8" d="M73.083 60.0001L73.083 81.1103C73.083 83.7077 71.6449 86.0915 69.3472 87.3027L52.1565 96.3647C51.496 96.7128 50.7952 96.9786 50.0699 97.156V97.156C36.8679 100.384 24.6918 89.0047 27.0214 75.6149L28.3462 68.0001"></path><path stroke="#00A67E" strokeWidth="8" d="M72.4017 70.1317L53.9515 80.3036C51.6604 81.5668 48.8561 81.4468 46.6812 79.9927L29.9329 68.7948C29.5218 68.52 29.1356 68.2097 28.7787 67.8676V67.8676C19.5463 59.0181 22.6016 43.5788 34.5086 38.9126L41.9051 36.014"></path><path stroke="#00A67E" strokeWidth="8" d="M62.9532 74.1335L44.4512 63.1363C42.2518 61.8289 40.9408 59.4257 41.0323 56.8687L41.7107 37.9075C41.7472 36.8867 41.9514 35.8789 42.3152 34.9244V34.9244C47.2007 22.1063 63.5467 18.3712 73.5146 27.7954L77.0337 31.1225"></path>
@@ -31,10 +39,14 @@ const EyeClosedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h
 // --- Data ---
 
 const integrations = [
+    { id: 'firebase', name: 'Firebase', description: 'Build full-stack apps with backend, auth, and a database.', icon: <FirebaseIcon /> },
     { id: 'chatgpt', name: 'ChatGPT', description: 'A powerful language model for generating human-like text and engaging in conversations', icon: <ChatGptIcon /> },
     { id: 'google-analytics', name: 'Google Analytics', description: 'Web analytics service that tracks and reports website traffic and user behavior', icon: <GoogleAnalyticsIcon /> },
     { id: 'pexels', name: 'Pexels', description: 'Access a vast library of high-quality, free stock photos and videos', icon: <PexelsIcon /> },
 ];
+
+const firebaseConfigFields = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+
 
 interface IntegrationsPageProps {
   onNavigate: (path: string) => void;
@@ -43,17 +55,27 @@ interface IntegrationsPageProps {
 }
 
 const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, onLogout }) => {
-  const [openIntegration, setOpenIntegration] = useState<string | null>(null);
+  const [openIntegration, setOpenIntegration] = useState<string | null>('firebase');
   const [apiKeys, setApiKeys] = useState<{ [key: string]: string }>({});
+  const [firebaseConfig, setFirebaseConfig] = useState<{ [key: string]: string }>({});
   const [keyVisibility, setKeyVisibility] = useState<{ [key: string]: boolean }>({});
   const [saveStatus, setSaveStatus] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     const loadedKeys: { [key: string]: string } = {};
+    const firebaseConf = localStorage.getItem('integration_key_firebase');
+    if (firebaseConf) {
+        try {
+            setFirebaseConfig(JSON.parse(firebaseConf));
+        } catch(e) { console.error("Failed to parse Firebase config", e); }
+    }
+
     integrations.forEach(int => {
-        const key = localStorage.getItem(`integration_key_${int.id}`);
-        if (key) {
-            loadedKeys[int.id] = key;
+        if (int.id !== 'firebase') {
+            const key = localStorage.getItem(`integration_key_${int.id}`);
+            if (key) {
+                loadedKeys[int.id] = key;
+            }
         }
         setSaveStatus(prev => ({...prev, [int.id]: 'Save'}));
     });
@@ -61,13 +83,17 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, o
   }, []);
 
   const handleSave = (id: string) => {
-    const key = apiKeys[id] || '';
     setSaveStatus(prev => ({...prev, [id]: 'Saving...'}));
     
-    if (key.trim()) {
-        localStorage.setItem(`integration_key_${id}`, key);
+    if (id === 'firebase') {
+        localStorage.setItem('integration_key_firebase', JSON.stringify(firebaseConfig));
     } else {
-        localStorage.removeItem(`integration_key_${id}`);
+        const key = apiKeys[id] || '';
+        if (key.trim()) {
+            localStorage.setItem(`integration_key_${id}`, key);
+        } else {
+            localStorage.removeItem(`integration_key_${id}`);
+        }
     }
 
     setTimeout(() => {
@@ -76,6 +102,10 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, o
             setSaveStatus(prev => ({...prev, [id]: 'Save'}));
         }, 1500);
     }, 500);
+  };
+  
+  const handleFirebaseConfigChange = (field: string, value: string) => {
+    setFirebaseConfig(prev => ({ ...prev, [field]: value }));
   };
 
   const handleToggle = (id: string) => setOpenIntegration(prev => (prev === id ? null : id));
@@ -106,31 +136,65 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ onNavigate, user, o
               </button>
               {openIntegration === int.id && (
                 <div className="bg-gray-50/70 p-6 border-t border-gray-200/80">
-                  <p className="font-semibold text-gray-700 mb-2">{int.name} API Key</p>
-                  <div className="relative">
-                    <input
-                      type={keyVisibility[int.id] ? 'text' : 'password'}
-                      value={apiKeys[int.id] || ''}
-                      onChange={(e) => handleKeyChange(int.id, e.target.value)}
-                      placeholder={`Enter your ${int.name} API key`}
-                      className="w-full p-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <button onClick={() => toggleVisibility(int.id)} className="absolute inset-y-0 right-0 px-3 flex items-center">
-                      {keyVisibility[int.id] ? <EyeOpenIcon /> : <EyeClosedIcon />}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between mt-4">
-                    <button 
-                        onClick={() => handleSave(int.id)} 
-                        disabled={saveStatus[int.id] !== 'Save'}
-                        className="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-black transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      {saveStatus[int.id] || 'Save'}
-                    </button>
-                    <a href="#" className="text-sm text-blue-600 hover:underline">
-                      How to get {int.name} API Key?
-                    </a>
-                  </div>
+                  {int.id === 'firebase' ? (
+                     <>
+                        <p className="font-semibold text-gray-700 mb-3">Firebase Web App Config</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {firebaseConfigFields.map(field => (
+                                <div key={field}>
+                                    <label className="text-sm font-medium text-gray-600 mb-1 block">{field}</label>
+                                    <input
+                                        type="text"
+                                        value={firebaseConfig[field] || ''}
+                                        onChange={(e) => handleFirebaseConfigChange(field, e.target.value)}
+                                        placeholder={`Enter your ${field}`}
+                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-center justify-between mt-6">
+                            <button
+                                onClick={() => handleSave(int.id)}
+                                disabled={saveStatus[int.id] !== 'Save'}
+                                className="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-black transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {saveStatus[int.id] || 'Save'}
+                            </button>
+                            <a href="https://firebase.google.com/docs/web/setup#add-sdks-initialize" target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                                How to get Firebase config?
+                            </a>
+                        </div>
+                    </>
+                  ) : (
+                    <>
+                    <p className="font-semibold text-gray-700 mb-2">{int.name} API Key</p>
+                    <div className="relative">
+                        <input
+                        type={keyVisibility[int.id] ? 'text' : 'password'}
+                        value={apiKeys[int.id] || ''}
+                        onChange={(e) => handleKeyChange(int.id, e.target.value)}
+                        placeholder={`Enter your ${int.name} API key`}
+                        className="w-full p-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button onClick={() => toggleVisibility(int.id)} className="absolute inset-y-0 right-0 px-3 flex items-center">
+                        {keyVisibility[int.id] ? <EyeOpenIcon /> : <EyeClosedIcon />}
+                        </button>
+                    </div>
+                    <div className="flex items-center justify-between mt-4">
+                        <button 
+                            onClick={() => handleSave(int.id)} 
+                            disabled={saveStatus[int.id] !== 'Save'}
+                            className="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-black transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                        {saveStatus[int.id] || 'Save'}
+                        </button>
+                        <a href="#" className="text-sm text-blue-600 hover:underline">
+                        How to get {int.name} API Key?
+                        </a>
+                    </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

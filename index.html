@@ -24,6 +24,22 @@
         }
       })();
     </script>
+    <!-- Firebase -->
+    <script type="module">
+      try {
+        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+        const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        
+        window.firebase = {
+          app: { initializeApp },
+          auth: { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut },
+          firestore: { getFirestore, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, deleteDoc }
+        };
+      } catch (e) {
+        console.error("Failed to load Firebase SDK:", e);
+      }
+    </script>
   <script type="importmap">
 {
   "imports": {
