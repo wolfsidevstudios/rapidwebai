@@ -33,7 +33,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
 
   return (
     <div 
-        className="relative h-screen w-screen bg-cover bg-center" 
+        className="relative h-full w-full bg-cover bg-center" 
         style={{ backgroundImage: "url('https://i.ibb.co/tTjwPg3Y/Google-AI-Studio-2025-10-27-T21-45-49-645-Z.png')" }}
     >
       <div className="flex flex-col items-center justify-center h-full w-full bg-black/10">

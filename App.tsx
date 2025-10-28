@@ -175,13 +175,37 @@ const App: React.FC = () => {
 
     return <HomePage onStart={handleCreateNewProject} />;
   };
-
+  
   const shouldShowSidebar = !location.startsWith('/app/preview/');
+
+  // Preview pages should be fullscreen and not wrapped in the main layout
+  if (!shouldShowSidebar) {
+      return (
+          <>
+              {renderPage()}
+              {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
+          </>
+      )
+  }
+
+  const isHomePage = location === '/';
+  // Sidebar is 88px wide with a 16px margin (m-4). Right edge is at 104px. Add 16px gap = 120px.
+  const mainContentLeftClass = isHomePage ? 'left-4' : 'left-[120px]';
 
   return (
     <>
-      {shouldShowSidebar && <Sidebar user={user} onNavigate={navigate} onLogout={handleLogout} />}
-      {renderPage()}
+      <Sidebar user={user} onNavigate={navigate} onLogout={handleLogout} />
+      
+      <main className={`
+          absolute top-4 bottom-4 right-4 
+          ${mainContentLeftClass}
+          transition-all duration-300 ease-in-out
+      `}>
+          <div className="w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-black">
+               {renderPage()}
+          </div>
+      </main>
+
       {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
     </>
   );

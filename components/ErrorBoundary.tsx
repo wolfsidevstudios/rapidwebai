@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -9,7 +9,8 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+// FIX: By extending `React.Component` directly, we ensure that the ErrorBoundary class correctly inherits properties like `props` and methods like `setState`, resolving the reported TypeScript errors on lines 29, 30, and 47.
+class ErrorBoundary extends React.Component<Props, State> {
   state: State = {
     hasError: false,
     error: null,
@@ -23,14 +24,15 @@ class ErrorBoundary extends Component<Props, State> {
     console.error("Uncaught error in preview:", error, errorInfo);
   }
   
-  // FIX: Converted componentDidUpdate and render to arrow functions to ensure 'this' is correctly bound, resolving issues with accessing 'this.props' and 'this.setState'.
-  componentDidUpdate = (prevProps: Props) => {
+  componentDidUpdate(prevProps: Props) {
+    // When the children prop changes (e.g., code is updated), reset the error state.
+    // This allows the preview to recover from a runtime error once the code is fixed.
     if (prevProps.children !== this.props.children && this.state.hasError) {
       this.setState({ hasError: false, error: null });
     }
   }
 
-  render = () => {
+  render() {
     if (this.state.hasError) {
       return (
         <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800">

@@ -253,8 +253,8 @@ New, modified code:`;
 
 
     return (
-        <div className="h-screen w-screen bg-black font-sans pl-28">
-            <header className="fixed top-0 left-28 right-0 z-40 bg-black/30 backdrop-blur-lg border-b border-white/10 text-white">
+        <div className="h-full w-full bg-black font-sans flex flex-col">
+            <header className="shrink-0 z-40 bg-black/30 backdrop-blur-lg border-b border-white/10 text-white">
                 <div className="flex justify-between items-center p-4 h-16">
                     <div className="flex items-center group">
                         {isEditingName ? (
@@ -291,7 +291,7 @@ New, modified code:`;
                 </div>
             </header>
             
-            <main className="flex h-full pt-16 text-white">
+            <main className="flex flex-grow text-white min-h-0">
                 <div className="w-full md:w-2/5 lg:w-1/3 h-full">
                     <ChatPanel
                     chatHistory={chatHistory}

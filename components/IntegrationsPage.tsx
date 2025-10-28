@@ -106,41 +106,41 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = () => {
   const toggleVisibility = (id: string) => setKeyVisibility(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 pt-8 pl-28 font-sans">
+    <div className="h-full w-full overflow-y-auto p-4 sm:p-8 pt-8 font-sans text-white">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-4xl font-bold text-gray-900 mb-8">Integrations</h1>
+        <h1 className="text-4xl font-bold text-gray-100 mb-8">Integrations</h1>
         <div className="space-y-3">
           {integrations.map(int => (
-            <div key={int.id} className="bg-white border border-gray-200/80 rounded-2xl shadow-sm transition-all duration-300">
+            <div key={int.id} className="bg-gray-900 border border-white/10 rounded-2xl shadow-sm transition-all duration-300">
               <button onClick={() => handleToggle(int.id)} className="w-full flex items-center justify-between p-5 text-left">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center mr-4">
                     {int.icon}
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-800">{int.name}</p>
-                    <p className="text-sm text-gray-500">{int.description}</p>
+                    <p className="font-semibold text-gray-200">{int.name}</p>
+                    <p className="text-sm text-gray-400">{int.description}</p>
                   </div>
                 </div>
-                <div className="text-gray-400">
+                <div className="text-gray-500">
                   {openIntegration === int.id ? <ChevronUpIcon /> : <ChevronRightIcon />}
                 </div>
               </button>
               {openIntegration === int.id && (
-                <div className="bg-gray-50/70 p-6 border-t border-gray-200/80">
+                <div className="bg-black/50 p-6 border-t border-white/10">
                   {int.id === 'firebase' ? (
                      <>
-                        <p className="font-semibold text-gray-700 mb-3">Firebase Web App Config</p>
+                        <p className="font-semibold text-gray-300 mb-3">Firebase Web App Config</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {firebaseConfigFields.map(field => (
                                 <div key={field}>
-                                    <label className="text-sm font-medium text-gray-600 mb-1 block">{field}</label>
+                                    <label className="text-sm font-medium text-gray-400 mb-1 block">{field}</label>
                                     <input
                                         type="text"
                                         value={firebaseConfig[field] || ''}
                                         onChange={(e) => handleFirebaseConfigChange(field, e.target.value)}
                                         placeholder={`Enter your ${field}`}
-                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className="w-full p-2 bg-gray-800 border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
                                     />
                                 </div>
                             ))}
@@ -149,25 +149,25 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = () => {
                             <button
                                 onClick={() => handleSave(int.id)}
                                 disabled={saveStatus[int.id] !== 'Save'}
-                                className="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-black transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-gray-200 text-black text-sm font-semibold rounded-lg hover:bg-white transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
                             >
                                 {saveStatus[int.id] || 'Save'}
                             </button>
-                            <a href="https://firebase.google.com/docs/web/setup#add-sdks-initialize" target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                            <a href="https://firebase.google.com/docs/web/setup#add-sdks-initialize" target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:underline">
                                 How to get Firebase config?
                             </a>
                         </div>
                     </>
                   ) : (
                     <>
-                    <p className="font-semibold text-gray-700 mb-2">{int.name} API Key</p>
+                    <p className="font-semibold text-gray-300 mb-2">{int.name} API Key</p>
                     <div className="relative">
                         <input
                         type={keyVisibility[int.id] ? 'text' : 'password'}
                         value={apiKeys[int.id] || ''}
                         onChange={(e) => handleKeyChange(int.id, e.target.value)}
                         placeholder={`Enter your ${int.name} API key`}
-                        className="w-full p-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full p-2 pr-10 bg-gray-800 border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
                         />
                         <button onClick={() => toggleVisibility(int.id)} className="absolute inset-y-0 right-0 px-3 flex items-center">
                         {keyVisibility[int.id] ? <EyeOpenIcon /> : <EyeClosedIcon />}
@@ -177,11 +177,11 @@ const IntegrationsPage: React.FC<IntegrationsPageProps> = () => {
                         <button 
                             onClick={() => handleSave(int.id)} 
                             disabled={saveStatus[int.id] !== 'Save'}
-                            className="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-black transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="px-4 py-2 bg-gray-200 text-black text-sm font-semibold rounded-lg hover:bg-white transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
                         >
                         {saveStatus[int.id] || 'Save'}
                         </button>
-                        <a href="#" className="text-sm text-blue-600 hover:underline">
+                        <a href="#" className="text-sm text-blue-400 hover:underline">
                         How to get {int.name} API Key?
                         </a>
                     </div>

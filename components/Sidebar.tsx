@@ -61,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onNavigate, onLogout }) => {
     );
 
     return (
-        <aside className="fixed inset-y-0 left-0 m-4 flex flex-col items-center justify-between py-5 bg-white/80 backdrop-blur-lg border border-gray-200/80 rounded-full shadow-lg z-50 w-[88px]">
+        <aside className="fixed inset-y-0 left-0 m-4 flex flex-col items-center justify-between py-5 bg-white border border-gray-200/80 rounded-full shadow-lg z-50 w-[88px]">
             {/* Main Icons */}
             <div className="flex flex-col items-center space-y-2">
                 <div 
