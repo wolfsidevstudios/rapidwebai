@@ -35,6 +35,7 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [location, setLocation] = useState(window.location.pathname);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [pendingNavigationProjectId, setPendingNavigationProjectId] = useState<string | null>(null);
 
   // --- Routing ---
   useEffect(() => {
@@ -43,10 +44,10 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = (path: string) => {
+  const navigate = useCallback((path: string) => {
     window.history.pushState({}, '', path);
     setLocation(path);
-  };
+  }, []);
 
   // --- Auth & Data Persistence ---
   useEffect(() => {
@@ -111,7 +112,7 @@ const App: React.FC = () => {
   };
 
   // --- Project Management ---
-  const handleCreateNewProject = (prompt: string) => {
+  const handleCreateNewProject = useCallback((prompt: string) => {
     if (!user) {
         alert("Please log in to create a project.");
         // @ts-ignore
@@ -152,16 +153,23 @@ export default App;
         createdAt: Date.now(),
     };
     setProjects(prev => [...prev, newProject]);
-    navigate(`/app/${newProject.id}`);
+    setPendingNavigationProjectId(newProject.id);
     
     setTimeout(() => {
         window.dispatchEvent(new CustomEvent('startProjectWithMessage', { detail: { projectId: newProject.id, message: prompt } }));
     }, 100);
-  };
+  }, [user]);
 
-  const updateProject = (updatedProject: Project) => {
+  useEffect(() => {
+    if (pendingNavigationProjectId && projects.find(p => p.id === pendingNavigationProjectId)) {
+      navigate(`/app/${pendingNavigationProjectId}`);
+      setPendingNavigationProjectId(null);
+    }
+  }, [pendingNavigationProjectId, projects, navigate]);
+
+  const updateProject = useCallback((updatedProject: Project) => {
     setProjects(prevProjects => prevProjects.map(p => p.id === updatedProject.id ? updatedProject : p));
-  }
+  }, []);
 
   // --- Render Logic ---
   const renderPage = () => {
