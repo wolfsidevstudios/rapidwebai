@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
 import useDebounce from '../hooks/useDebounce';
@@ -44,11 +44,11 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeCha
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
   const debouncedCode = useDebounce(code, 500);
 
-  const handleConsoleMessage = (message: ConsoleMessage) => {
+  const handleConsoleMessage = useCallback((message: ConsoleMessage) => {
     setConsoleMessages(prev => [...prev, message]);
-  };
+  }, []);
   
-  const clearConsole = () => setConsoleMessages([]);
+  const clearConsole = useCallback(() => setConsoleMessages([]), []);
 
   return (
     <div className="h-full flex flex-col relative bg-[#1e1e1e]">
