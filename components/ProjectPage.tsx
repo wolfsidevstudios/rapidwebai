@@ -5,9 +5,6 @@ import type { Project } from '../App';
 import { GoogleGenAI } from "@google/genai";
 import PublishModal from './PublishModal';
 
-// @ts-ignore - esbuild is loaded from a script tag in index.html
-const esbuild = window.esbuild;
-
 const EditIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z" />
@@ -29,9 +26,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const [files, setFiles] = useState(project.files);
     const [activeFile, setActiveFile] = useState('src/App.jsx');
     const [chatHistory, setChatHistory] = useState(project.chatHistory);
-    const [bundledCode, setBundledCode] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [selectedApis, setSelectedApis] = useState<string[]>([]);
@@ -39,89 +33,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const [isEditingName, setIsEditingName] = useState(false);
     const [projectName, setProjectName] = useState(project.name);
     const inputRef = useRef<HTMLInputElement>(null);
-
-    const [isEsbuildInitialized, setIsEsbuildInitialized] = useState(false);
-
-
-    // --- ESBuild Bundler ---
-    useEffect(() => {
-        const initializeEsbuild = async () => {
-            if (isEsbuildInitialized || !esbuild) return;
-            try {
-                await esbuild.initialize({
-                    wasmURL: 'https://unpkg.com/esbuild-wasm@0.21.4/esbuild.wasm',
-                    worker: true,
-                });
-                setIsEsbuildInitialized(true);
-            } catch(e) {
-                console.error("Failed to initialize esbuild", e);
-                setError("Failed to initialize code bundler. Please refresh the page.");
-            }
-        };
-        initializeEsbuild();
-    }, [isEsbuildInitialized]);
-
-    const bundleProject = useCallback(async (projectFiles: Record<string, string>) => {
-        if (!isEsbuildInitialized) return;
-        
-        setError(null);
-
-        try {
-            const result = await esbuild.build({
-                entryPoints: ['src/main.jsx'],
-                bundle: true,
-                write: false,
-                plugins: [{
-                    name: 'in-memory-file-loader',
-                    setup(build: any) {
-                        build.onResolve({ filter: /.*/ }, (args: any) => {
-                             if (args.path === 'src/main.jsx') {
-                                return { path: args.path, namespace: 'in-memory' };
-                            }
-                            if (args.path.startsWith('./') || args.path.startsWith('../')) {
-                               const path = new URL(args.path, 'file://' + args.resolveDir + '/').pathname.substring(1);
-                               const potentialPaths = [
-                                 path, `${path}.js`, `${path}.jsx`, `${path}.ts`, `${path}.tsx`, `${path}.css`,
-                                 `${path}/index.js`, `${path}/index.jsx`, `${path}/index.ts`, `${path}/index.tsx`
-                               ];
-                               for (const p of potentialPaths) {
-                                   if (projectFiles[p]) return { path: p, namespace: 'in-memory' };
-                               }
-                            }
-                            return { path: args.path, external: true };
-                        });
-                        build.onLoad({ filter: /.*/, namespace: 'in-memory' }, (args: any) => {
-                            const fileContent = projectFiles[args.path];
-                            if (fileContent === undefined) return { errors: [{ text: `File not found: ${args.path}` }] };
-                            
-                            let loader = 'jsx';
-                            if (args.path.endsWith('.css')) loader = 'css';
-                            
-                            return {
-                                contents: fileContent,
-                                loader: loader,
-                                resolveDir: args.path.substring(0, args.path.lastIndexOf('/'))
-                            };
-                        });
-                    }
-                }],
-                define: { 'process.env.NODE_ENV': '"production"' },
-                jsxFactory: 'React.createElement',
-                jsxFragment: 'React.Fragment',
-            });
-            setBundledCode(result.outputFiles[0].text);
-            setError(null);
-        } catch (err: any) {
-            setError(err.message.split('\n').slice(0, 5).join('\n'));
-            setBundledCode(null);
-        }
-    }, [isEsbuildInitialized]);
-
-    useEffect(() => {
-        if (isEsbuildInitialized) {
-            bundleProject(files);
-        }
-    }, [files, bundleProject, isEsbuildInitialized]);
 
     // --- Project State Management ---
     useEffect(() => {
@@ -192,7 +103,7 @@ Follow this standard project structure:
 - \`src/App.jsx\`: The root component.
 - \`src/components/\`: Reusable components.
 - \`src/styles.css\`: A stylesheet imported by main.jsx.
-- \`package.json\`: Project dependencies.
+- \`package.json\`: Project dependencies. Users can import any NPM package.
 
 IMPORTANT RULES:
 1.  **JSON ONLY**: Your entire output MUST be a single JSON object. Do not include any text, explanations, or markdown formatting like \`\`\`json before or after the JSON block.
@@ -221,8 +132,7 @@ New file structure (as a JSON object):`;
 
             if (typeof newFiles === 'object' && newFiles !== null && Object.keys(newFiles).length > 0) {
                 setFiles(newFiles);
-                setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the application files. Take a look at the file explorer and the preview!" }]);
-                setActiveView('preview');
+                setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the application files. Check out the preview and the new console for debugging!" }]);
                 // Ensure the active file still exists
                 if (!newFiles[activeFile]) {
                     setActiveFile(Object.keys(newFiles).find(k => k.startsWith('src/')) || 'src/App.jsx');
@@ -271,10 +181,6 @@ New file structure (as a JSON object):`;
                         onFileSelect={setActiveFile}
                         fileContent={files[activeFile] || ''}
                         onFileContentChange={handleFileContentChange}
-                        bundledCode={bundledCode}
-                        error={error}
-                        activeView={activeView}
-                        onViewChange={setActiveView}
                     />
                 </div>
             </main>
