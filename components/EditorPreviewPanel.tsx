@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
-import PublishModal from './PublishModal';
 
 interface EditorPreviewPanelProps {
-  code: string;
-  onCodeChange: (value: string) => void;
-  transpiledCode: string | null;
+  fileContent: string;
+  onFileContentChange: (value: string) => void;
+  bundledCode: string | null;
   error: string | null;
   activeView: 'code' | 'preview';
   onViewChange: (view: 'code' | 'preview') => void;
+  activeFile: string;
 }
 
 const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
-  code,
-  onCodeChange,
-  transpiledCode,
+  fileContent,
+  onFileContentChange,
+  bundledCode,
   error,
   activeView,
   onViewChange,
+  activeFile
 }) => {
 
   return (
@@ -51,17 +52,21 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
       <div className="flex-grow h-full w-full overflow-hidden">
         {activeView === 'code' ? (
             <div className="h-full flex flex-col">
-                 <CodeEditor value={code} onChange={onCodeChange} />
+                 <div className="bg-[#2a2a2a] text-gray-400 px-4 py-2 text-sm font-mono border-b border-white/10">
+                    {activeFile}
+                 </div>
+                 <CodeEditor value={fileContent} onChange={onFileContentChange} />
                  {error && (
                     <div className="bg-red-900 text-red-200 p-4 overflow-auto text-sm font-mono shrink-0" style={{maxHeight: '150px'}}>
+                        <h3 className="font-bold text-red-100 mb-2">Bundler Error:</h3>
                         <pre className="whitespace-pre-wrap">{error}</pre>
                     </div>
                  )}
             </div>
         ) : (
             <div className="h-full w-full p-4">
-              <div className="bg-gray-300 h-full w-full rounded-2xl overflow-hidden">
-                  <Preview code={transpiledCode} />
+              <div className="bg-white h-full w-full rounded-2xl overflow-hidden">
+                  <Preview code={bundledCode} />
               </div>
             </div>
         )}

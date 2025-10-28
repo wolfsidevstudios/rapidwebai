@@ -25,7 +25,7 @@ export interface UserProfile {
 export interface Project {
   id: string;
   name: string;
-  code: string;
+  files: Record<string, string>;
   chatHistory: ChatMessage[];
   createdAt: number;
 }
@@ -122,10 +122,69 @@ const App: React.FC = () => {
         }
         return;
     }
+    const defaultFiles = {
+      'public/index.html': `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="../src/main.jsx"></script>
+  </body>
+</html>`,
+      'src/main.jsx': `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './styles.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);`,
+      'src/App.jsx': `import React from 'react';
+
+function App() {
+  return (
+    <div className="app">
+      <h1>Generating your app...</h1>
+      <p>The AI is creating the files for your new project. This might take a moment.</p>
+    </div>
+  );
+}
+
+export default App;`,
+      'src/styles.css': `body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff;
+}
+.app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    text-align: center;
+}
+`,
+      'package.json': `{
+  "name": "new-react-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}`
+    };
     const newProject: Project = {
         id: `proj-${Date.now()}`,
         name: prompt.substring(0, 50) || 'New Project',
-        code: `import React from 'react';\n\nconst App = () => {\n  return (\n    <div className="flex items-center justify-center h-full bg-gray-100 p-4">\n      <p className="text-gray-500">Generating your component...</p>\n    </div>\n  );\n};\n\nexport default App;`,
+        files: defaultFiles,
         chatHistory: [],
         createdAt: Date.now(),
     };
@@ -156,7 +215,8 @@ const App: React.FC = () => {
     const previewMatch = location.match(/^\/app\/preview\/(proj-\d+)$/);
     if (previewMatch) {
       const projectId = previewMatch[1];
-      const project = projects.find(p => p.id === projectId); 
+      const allProjects = projects.length > 0 ? projects : JSON.parse(localStorage.getItem(`projects_${user?.email}`) || '[]');
+      const project = allProjects.find((p: Project) => p.id === projectId); 
       if (!project) {
         return <div className="h-screen w-screen flex items-center justify-center text-center text-white bg-black p-4">Project not found.<br/> (This is a simulated public link. In a real app, this would fetch from a database.) <a href="/" className='underline ml-2'>Go home</a></div>;
       }
