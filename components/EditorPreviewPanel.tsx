@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
-import FileExplorer from './FileExplorer';
 import useDebounce from '../hooks/useDebounce';
 
 export interface ConsoleMessage {
@@ -11,11 +10,8 @@ export interface ConsoleMessage {
 }
 
 interface EditorPreviewPanelProps {
-  files: Record<string, string>;
-  activeFile: string;
-  onFileSelect: (path: string) => void;
-  fileContent: string;
-  onFileContentChange: (value: string) => void;
+  code: string;
+  onCodeChange: (value: string) => void;
 }
 
 const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => {
@@ -43,12 +39,10 @@ const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => 
     );
 };
 
-const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
-  files, activeFile, onFileSelect, fileContent, onFileContentChange,
-}) => {
+const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeChange }) => {
   const [activeView, setActiveView] = useState<'preview' | 'code' | 'console'>('preview');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
-  const debouncedFiles = useDebounce(files, 500);
+  const debouncedCode = useDebounce(code, 500);
 
   const handleConsoleMessage = (message: ConsoleMessage) => {
     setConsoleMessages(prev => [...prev, message]);
@@ -78,19 +72,11 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
         
       <div className="flex-grow h-full w-full overflow-hidden">
         {activeView === 'code' && (
-            <div className="h-full w-full flex">
-                <div className="w-[250px] h-full bg-[#1e1e1e] border-r border-white/10 shrink-0">
-                    <FileExplorer files={files} activeFile={activeFile} onFileSelect={onFileSelect} />
-                </div>
-                <div className="flex-grow h-full flex flex-col">
-                    <div className="bg-[#2a2a2a] text-gray-400 px-4 py-2 text-sm font-mono border-b border-white/10 shrink-0">{activeFile}</div>
-                    <div className="flex-grow overflow-auto"><CodeEditor value={fileContent} onChange={onFileContentChange} /></div>
-                </div>
-            </div>
+          <CodeEditor value={code} onChange={onCodeChange} />
         )}
         {activeView === 'preview' && (
             <div className="h-full w-full bg-white">
-              <Preview files={debouncedFiles} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
+              <Preview code={debouncedCode} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
             </div>
         )}
         {activeView === 'console' && <ConsoleView messages={consoleMessages} />}

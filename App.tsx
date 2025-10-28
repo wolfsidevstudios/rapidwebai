@@ -3,7 +3,6 @@ declare const google: any;
 
 import React, { useState, useEffect, useCallback } from 'react';
 import HomePage from './components/HomePage';
-import { GoogleGenAI } from "@google/genai";
 import OnboardingModal from './components/OnboardingModal';
 import IntegrationsPage from './components/IntegrationsPage';
 import ProjectPage from './components/ProjectPage';
@@ -25,7 +24,7 @@ export interface UserProfile {
 export interface Project {
   id: string;
   name: string;
-  files: Record<string, string>;
+  code: string; // Changed from 'files'
   chatHistory: ChatMessage[];
   createdAt: number;
 }
@@ -122,69 +121,33 @@ const App: React.FC = () => {
         }
         return;
     }
-    const defaultFiles = {
-      'public/index.html': `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>React App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="../src/main.jsx"></script>
-  </body>
-</html>`,
-      'src/main.jsx': `import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './styles.css';
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);`,
-      'src/App.jsx': `import React from 'react';
+    const defaultCode = `import React from 'react';
 
 function App() {
+  const containerStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
+    textAlign: 'center',
+    fontFamily: 'sans-serif',
+  };
+  
   return (
-    <div className="app">
+    <div style={containerStyle}>
       <h1>Generating your app...</h1>
-      <p>The AI is creating the files for your new project. This might take a moment.</p>
+      <p>The AI is creating your new project. This might take a moment.</p>
     </div>
   );
 }
 
-export default App;`,
-      'src/styles.css': `body {
-  font-family: sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #ffffff;
-}
-.app {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    text-align: center;
-}
-`,
-      'package.json': `{
-  "name": "new-react-app",
-  "version": "1.0.0",
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  }
-}`
-    };
+export default App;
+`;
     const newProject: Project = {
         id: `proj-${Date.now()}`,
         name: prompt.substring(0, 50) || 'New Project',
-        files: defaultFiles,
+        code: defaultCode,
         chatHistory: [],
         createdAt: Date.now(),
     };

@@ -13,7 +13,7 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
 
     return (
         <div className="h-screen w-screen bg-white">
-            <Preview files={project.files} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
+            <Preview code={project.code} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
         </div>
     );
 };

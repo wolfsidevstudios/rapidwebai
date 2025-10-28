@@ -23,8 +23,7 @@ interface ProjectPageProps {
 }
 
 const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) => {
-    const [files, setFiles] = useState(project.files);
-    const [activeFile, setActiveFile] = useState('src/App.jsx');
+    const [code, setCode] = useState(project.code);
     const [chatHistory, setChatHistory] = useState(project.chatHistory);
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
@@ -36,13 +35,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 
     // --- Project State Management ---
     useEffect(() => {
-        onUpdateProject({ ...project, files, chatHistory, name: projectName });
-    }, [files, chatHistory, projectName]);
+        onUpdateProject({ ...project, code, chatHistory, name: projectName });
+    }, [code, chatHistory, projectName]);
     
-    const handleFileContentChange = (newContent: string) => {
-        setFiles(prev => ({...prev, [activeFile]: newContent}));
-    }
-
     // --- Project Name Edit ---
     useEffect(() => { setProjectName(project.name); }, [project.name]);
     useEffect(() => { if (isEditingName) inputRef.current?.focus(); }, [isEditingName]);
@@ -89,63 +84,40 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
-            const fullPrompt = `You are an expert full-stack React developer AI. Your task is to modify a React application based on the user's request.
+            const fullPrompt = `You are an expert React developer AI. Your task is to modify a React application based on the user's request by generating a single, self-contained TSX file.
 
-You MUST return your response as a single, valid JSON object that represents the *changes* to the file system.
+**Instructions for the Response:**
+1.  **SINGLE FILE ONLY**: Your entire output MUST be a single block of TSX code for a React component. Do NOT use markdown formatting like \`\`\`tsx.
+2.  **SELF-CONTAINED**: All components, logic, and styling must be included in this single file. Do NOT use local \`import\` statements (e.g., \`import MyComponent from './MyComponent'\`).
+3.  **STYLING**: Use inline styles (e.g., \`style={{ color: 'blue' }}\`) or include a \`<style>\` tag as a string within your main component.
+4.  **ROUTING**: To create multiple pages, use React state. Do not use libraries like 'react-router-dom'. Manage the current page in state and conditionally render components.
+    *Example:*
+    \`\`\`jsx
+    const [page, setPage] = useState('home');
+    const navigate = (newPage) => setPage(newPage);
+    // ... then render based on 'page' state.
+    \`\`\`
+5.  **EXTERNAL LIBRARIES**: If you need a third-party library (e.g., for charts or animations), import it from a CDN like 'esm.run' at the top of the file.
+    *Example:* \`import confetti from 'https://esm.run/canvas-confetti';\`
+6.  **ENTRY POINT**: The main component must be the default export. (e.g., \`export default App;\`)
 
-**Instructions for the JSON response:**
-1.  **JSON ONLY**: Your entire output MUST be a single JSON object. Do not include any text, explanations, or markdown formatting like \`\`\`json before or after the JSON block.
-2.  **Only Include Changes**: The JSON object should ONLY contain entries for files that are new, have been modified, or should be deleted. Do NOT return the entire file structure.
-3.  **To Add/Modify a File**: Set the key to the full file path (e.g., "src/components/NewComponent.jsx") and the value to the new string content of the file.
-4.  **To Delete a File**: Set the key to the full file path (e.g., "src/old-component.jsx") and the value to \`null\`.
-5.  **Best Practices**: Write clean, readable, and maintainable React code. Ensure all imports are correct. If a new dependency is needed, add it to \`package.json\`.
-6.  **Styling**: For styling, create or modify CSS files (e.g., \`src/styles.css\`). These files will be automatically linked in the preview. **You MUST NOT import CSS files directly into any JavaScript or JSX files (e.g., \`import './styles.css'\` is forbidden).**
-7.  **Assets (Images, Fonts)**: Do not use local image or font files. Instead, use absolute URLs to public assets (e.g., from a CDN like unpkg or a service like imgur).
-
-**Current file structure (for your reference):**
+**Current Code:**
 ---
-${JSON.stringify(files, null, 2)}
+${code}
 ---
 **User request:** "${message}"
 ---
-**JSON object with file changes:**`;
+**Updated self-contained TSX code:**`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
-                contents: fullPrompt,
-                config: { responseMimeType: 'application/json' }
+                contents: fullPrompt
             });
 
             const responseText = response.text.trim();
-            const fileChanges = JSON.parse(responseText);
-
-            if (typeof fileChanges === 'object' && fileChanges !== null) {
-                let activeFileStillExists = false;
-                setFiles(currentFiles => {
-                    const updatedFiles = { ...currentFiles };
-                    for (const path in fileChanges) {
-                        if (fileChanges[path] === null) {
-                            delete updatedFiles[path];
-                        } else {
-                            updatedFiles[path] = fileChanges[path];
-                        }
-                    }
-                    activeFileStillExists = !!updatedFiles[activeFile];
-                    return updatedFiles;
-                });
-
-                setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the application files. Check out the preview and the new console for debugging!" }]);
-                
-                // If the active file was deleted, select a new one.
-                if (!activeFileStillExists) {
-                    setFiles(currentFiles => {
-                         setActiveFile(Object.keys(currentFiles).find(k => k.startsWith('src/')) || 'src/App.jsx');
-                         return currentFiles;
-                    });
-                }
-            } else {
-                throw new Error("AI returned an invalid response. Expected a JSON object of file changes.");
-            }
+            setCode(responseText);
+            setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the application. Check out the new preview!" }]);
+            
         } catch (err: unknown) {
             console.error(err);
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -182,11 +154,8 @@ ${JSON.stringify(files, null, 2)}
                 </div>
                 <div className="w-3/5 h-full">
                     <EditorPreviewPanel
-                        files={files}
-                        activeFile={activeFile}
-                        onFileSelect={setActiveFile}
-                        fileContent={files[activeFile] || ''}
-                        onFileContentChange={handleFileContentChange}
+                        code={code}
+                        onCodeChange={setCode}
                     />
                 </div>
             </main>
