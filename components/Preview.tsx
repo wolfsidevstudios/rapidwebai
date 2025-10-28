@@ -66,6 +66,57 @@ const Preview: React.FC<PreviewProps> = ({ files, onConsoleMessage, clearConsole
         });
     },
   };
+  
+  const inMemoryFileLoaderPlugin = (projectFiles: Record<string, string>) => ({
+    name: 'in-memory-file-loader',
+    setup(build: any) {
+      // 1. Intercept the entry point.
+      build.onResolve({ filter: /^src\/main\.jsx$/ }, (args: any) => {
+        return { path: args.path, namespace: 'in-memory' };
+      });
+
+      // 2. Intercept relative paths inside files that are already in the "in-memory" namespace.
+      build.onResolve({ filter: /^\.{1,2}\//, namespace: 'in-memory' }, (args: any) => {
+        const importerDir = args.importer.substring(0, args.importer.lastIndexOf('/'));
+        const resolvedPath = new URL(args.path, `file:///${importerDir}/`).pathname.substring(1);
+        
+        const potentialPaths = [
+            resolvedPath,
+            `${resolvedPath}.js`, `${resolvedPath}.jsx`,
+            `${resolvedPath}.ts`, `${resolvedPath}.tsx`,
+            `${resolvedPath}.css`,
+            `${resolvedPath}/index.js`, `${resolvedPath}/index.jsx`,
+            `${resolvedPath}/index.ts`, `${resolvedPath}/index.tsx`,
+        ];
+
+        for (const p of potentialPaths) {
+            if (projectFiles[p]) {
+                return { path: p, namespace: 'in-memory' };
+            }
+        }
+        
+        return { errors: [{ text: `File not found: '${args.path}' from '${args.importer}'` }] };
+      });
+      
+      // 3. Define how to load files from our "in-memory" namespace.
+      build.onLoad({ filter: /.*/, namespace: 'in-memory' }, (args: any) => {
+          const fileContent = projectFiles[args.path];
+          if (fileContent === undefined) {
+              return { errors: [{ text: `File not found: ${args.path}` }] };
+          }
+          
+          const extension = args.path.split('.').pop();
+          const loader = extension === 'css' ? 'css' : 'jsx';
+
+          return { 
+            contents: fileContent, 
+            loader, 
+            resolveDir: args.path.substring(0, args.path.lastIndexOf('/')) 
+          };
+      });
+    }
+  });
+
 
   const bundleProject = useCallback(async (projectFiles: Record<string, string>) => {
     if (!isEsbuildInitialized) return;
@@ -78,29 +129,9 @@ const Preview: React.FC<PreviewProps> = ({ files, onConsoleMessage, clearConsole
         entryPoints: ['src/main.jsx'],
         bundle: true,
         write: false,
-        plugins: [{
-          name: 'in-memory-file-loader',
-          setup(build: any) {
-            build.onResolve({ filter: /.*/ }, (args: any) => {
-              if (args.path === 'src/main.jsx') return { path: 'src/main.jsx', namespace: 'in-memory' };
-              if (args.path.startsWith('./') || args.path.startsWith('../')) {
-                const path = new URL(args.path, 'file://' + args.resolveDir + '/').pathname.substring(1);
-                 const potentialPaths = [ path, `${path}.js`, `${path}.jsx`, `${path}.ts`, `${path}.tsx`, `${path}.css`, `${path}/index.js`, `${path}/index.jsx`, `${path}/index.ts`, `${path}/index.tsx` ];
-                for (const p of potentialPaths) {
-                    if (projectFiles[p]) return { path: p, namespace: 'in-memory' };
-                }
-              }
-              return { path: args.path, namespace: 'npm' };
-            });
-            build.onLoad({ filter: /.*/, namespace: 'in-memory' }, (args: any) => {
-                const fileContent = projectFiles[args.path];
-                if (fileContent === undefined) return { errors: [{ text: `File not found: ${args.path}` }] };
-                const loader = args.path.endsWith('.css') ? 'css' : 'jsx';
-                return { contents: fileContent, loader, resolveDir: args.path.substring(0, args.path.lastIndexOf('/')) };
-            });
-          }
-        },
-        fetchPlugin,
+        plugins: [
+          inMemoryFileLoaderPlugin(projectFiles),
+          fetchPlugin,
         ],
         define: { 'process.env.NODE_ENV': '"production"' },
         jsxFactory: 'React.createElement',

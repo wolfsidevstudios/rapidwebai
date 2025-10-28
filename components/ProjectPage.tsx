@@ -89,37 +89,26 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
-            // NOTE: Integration context generation is omitted for brevity but would be similar to the previous version.
-            
-            const fullPrompt = `You are an expert full-stack React developer AI. Your task is to generate or modify a complete multi-file React application based on the user's request.
+            const fullPrompt = `You are an expert full-stack React developer AI. Your task is to modify a React application based on the user's request.
 
-You MUST return your response as a single, valid JSON object. This object represents the file system of the React application.
-The keys of the JSON object are the full file paths (e.g., "src/components/Button.jsx").
-The values are the string content of those files.
+You MUST return your response as a single, valid JSON object that represents the *changes* to the file system.
 
-Follow this standard project structure:
-- \`public/index.html\`: The main HTML file.
-- \`src/main.jsx\`: The application entry point (renders App). It must import a stylesheet.
-- \`src/App.jsx\`: The root component.
-- \`src/components/\`: Reusable components.
-- \`src/styles.css\`: A stylesheet imported by main.jsx.
-- \`package.json\`: Project dependencies. Users can import any NPM package.
-
-IMPORTANT RULES:
+**Instructions for the JSON response:**
 1.  **JSON ONLY**: Your entire output MUST be a single JSON object. Do not include any text, explanations, or markdown formatting like \`\`\`json before or after the JSON block.
-2.  **Complete Structure**: You must return ALL the files for the project, not just the ones you changed. Start from the provided "Current file structure".
-3.  **Entry Point**: The application must have an entry point at \`src/main.jsx\`.
-4.  **Dependencies**: List required dependencies in \`package.json\`.
-5.  **Runnable Code**: All files must contain complete, runnable code. Do not use placeholder comments.
-6.  **Imports**: Use standard ES6 imports. Relative imports (\`import Button from './components/Button.jsx'\`) are required.
+2.  **Only Include Changes**: The JSON object should ONLY contain entries for files that are new, have been modified, or should be deleted. Do NOT return the entire file structure.
+3.  **To Add/Modify a File**: Set the key to the full file path (e.g., "src/components/NewComponent.jsx") and the value to the new string content of the file.
+4.  **To Delete a File**: Set the key to the full file path (e.g., "src/old-component.jsx") and the value to \`null\`.
+5.  **Best Practices**: Write clean, readable, and maintainable React code. Ensure all imports are correct. If a new dependency is needed, add it to \`package.json\`.
+6.  **Styling**: Use standard CSS in a single \`src/styles.css\` file. This file MUST be imported in \`src/main.jsx\`. Apply styles using standard \`className\` attributes.
+7.  **Assets (Images, Fonts)**: Do not use local image or font files. Instead, use absolute URLs to public assets.
 
-Current file structure (as a JSON object):
+**Current file structure (for your reference):**
 ---
 ${JSON.stringify(files, null, 2)}
 ---
-User request: "${message}"
+**User request:** "${message}"
 ---
-New file structure (as a JSON object):`;
+**JSON object with file changes:**`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
@@ -128,17 +117,34 @@ New file structure (as a JSON object):`;
             });
 
             const responseText = response.text.trim();
-            const newFiles = JSON.parse(responseText);
+            const fileChanges = JSON.parse(responseText);
 
-            if (typeof newFiles === 'object' && newFiles !== null && Object.keys(newFiles).length > 0) {
-                setFiles(newFiles);
+            if (typeof fileChanges === 'object' && fileChanges !== null) {
+                let activeFileStillExists = false;
+                setFiles(currentFiles => {
+                    const updatedFiles = { ...currentFiles };
+                    for (const path in fileChanges) {
+                        if (fileChanges[path] === null) {
+                            delete updatedFiles[path];
+                        } else {
+                            updatedFiles[path] = fileChanges[path];
+                        }
+                    }
+                    activeFileStillExists = !!updatedFiles[activeFile];
+                    return updatedFiles;
+                });
+
                 setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the application files. Check out the preview and the new console for debugging!" }]);
-                // Ensure the active file still exists
-                if (!newFiles[activeFile]) {
-                    setActiveFile(Object.keys(newFiles).find(k => k.startsWith('src/')) || 'src/App.jsx');
+                
+                // If the active file was deleted, select a new one.
+                if (!activeFileStillExists) {
+                    setFiles(currentFiles => {
+                         setActiveFile(Object.keys(currentFiles).find(k => k.startsWith('src/')) || 'src/App.jsx');
+                         return currentFiles;
+                    });
                 }
             } else {
-                throw new Error("Received an invalid or empty file structure from the AI.");
+                throw new Error("AI returned an invalid response. Expected a JSON object of file changes.");
             }
         } catch (err: unknown) {
             console.error(err);
