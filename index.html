@@ -13,11 +13,26 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!--
+      The import map must be declared before any scripts that use modules.
+      This allows bare specifiers like "@google/genai" to be resolved correctly.
+    -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0"
+      }
+    }
+    </script>
     <!-- Gemini API -->
     <script type="module">
       (async () => {
         try {
-          const { GoogleGenAI } = await import("https://esm.run/@google/genai");
+          // This now uses the importmap to resolve "@google/genai"
+          const { GoogleGenAI } = await import("@google/genai");
           window.GoogleGenAI = GoogleGenAI;
         } catch (e) {
           console.error("Failed to load GoogleGenAI:", e);
@@ -42,17 +57,7 @@
         }
       })();
     </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0"
-  }
-}
-</script>
-</head>
+  </head>
   <body class="bg-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
