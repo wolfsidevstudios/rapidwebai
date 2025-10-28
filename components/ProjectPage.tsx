@@ -32,9 +32,14 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const [isEditingName, setIsEditingName] = useState(false);
     const [projectName, setProjectName] = useState(project.name);
     const inputRef = useRef<HTMLInputElement>(null);
+    const isInitialMount = useRef(true);
 
     // --- Project State Management ---
     useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
         onUpdateProject({ ...project, code, chatHistory, name: projectName });
     }, [code, chatHistory, projectName]);
     
