@@ -53,14 +53,6 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
         </style>
         <!-- 1. Load Babel for in-iframe transpilation -->
         <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
-        <script type="importmap">
-        {
-          "imports": {
-            "react": "https://esm.run/react@18",
-            "react-dom/client": "https://esm.run/react-dom@18/client"
-          }
-        }
-        <\/script>
       </head>
       <body>
         <div id="root"></div>
@@ -89,7 +81,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             console.error(error);
             const errorOverlay = document.createElement('div');
             errorOverlay.className = 'runtime-error-overlay';
-            errorOverlay.innerHTML = '<h3>Error</h3>' + (error.message || 'An unknown error occurred.');
+            errorOverlay.innerHTML = '<h3>Error</h3>' + (error.stack || error.message || 'An unknown error occurred.');
             // Clear previous content and show the error
             document.body.innerHTML = ''; 
             document.body.appendChild(errorOverlay);
@@ -111,8 +103,14 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
               filename: 'App.tsx'
             }).code;
 
+            // IMPORTANT: An import map in the document does not apply to modules loaded via blob URLs.
+            // We must replace bare module specifiers with full CDN URLs to ensure they resolve correctly.
+            const codeWithAbsoluteImports = (transpiledCode || '')
+              .replace(/from\s+['"]react['"]/g, 'from "https://esm.run/react@18"')
+              .replace(/from\s+['"]react-dom\/client['"]/g, 'from "https://esm.run/react-dom@18/client"');
+
             // Use a blob URL to import the transpiled code as an ES module
-            const blob = new Blob([transpiledCode], { type: 'text/javascript' });
+            const blob = new Blob([codeWithAbsoluteImports], { type: 'text/javascript' });
             const url = URL.createObjectURL(blob);
             
             import(url).then(async (module) => {
@@ -123,8 +121,9 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
                   throw new Error("The code must export a default React component.");
               }
               
-              const React = await import('react');
-              const { createRoot } = await import('react-dom/client');
+              // Import React/ReactDOM from absolute URLs as well for robustness
+              const React = await import('https://esm.run/react@18');
+              const { createRoot } = await import('https://esm.run/react-dom@18/client');
               const root = createRoot(document.getElementById('root'));
               root.render(React.createElement(App));
             }).catch(handleError);
