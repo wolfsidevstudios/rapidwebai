@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import type { ConsoleMessage } from './EditorPreviewPanel';
 
@@ -58,33 +57,15 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             font-family: system-ui, sans-serif; color: #ff8080;
           }
         </style>
-        <!-- 1. Load Babel for in-browser transpilation -->
+        <!-- Load UMD builds for React, ReactDOM, and Babel -->
+        <script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>
         <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
-        
-        <!-- 2. Import Map to resolve bare module specifiers -->
-        <script type="importmap">
-        {
-          "imports": {
-            "react": "https://esm.run/react@18",
-            "react-dom": "https://esm.run/react-dom@18",
-            "react-dom/client": "https://esm.run/react-dom@18/client",
-            "framer-motion": "https://esm.run/framer-motion",
-            "d3": "https://esm.run/d3",
-            "chart.js": "https://esm.run/chart.js",
-            "react-chartjs-2": "https://esm.run/react-chartjs-2",
-            "axios": "https://esm.run/axios",
-            "clsx": "https://esm.run/clsx",
-            "lodash": "https://esm.run/lodash",
-            "date-fns": "https://esm.run/date-fns",
-            "canvas-confetti": "https://esm.run/canvas-confetti"
-          }
-        }
-        <\/script>
       </head>
       <body>
         <div id="root"></div>
 
-        <script type="module">
+        <script type="text/javascript">
             // --- Console Interceptor ---
             const originalConsole = { ...window.console };
             const formatArgs = (args) => args.map(arg => {
@@ -106,7 +87,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
 
             // --- Error Handling ---
             const handleError = (error) => {
-                console.error(error); // Log to parent console as well
+                console.error(error); // Log to parent console
                 const root = document.getElementById('root');
                 if (root) {
                     const errorStack = error.stack ? error.stack.replace(/<anonymous>:/g, 'App.tsx:') : error.message;
@@ -117,30 +98,31 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
             window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
             
-            // Import React/ReactDOM for rendering. The import map will resolve them.
-            import React from 'react';
-            import ReactDOM from 'react-dom/client';
-
+            // --- Legacy require-based execution logic ---
             try {
-                // --- Code Injection, Transpilation, and Execution ---
+                // This custom, limited 'require' function is the source of the original issue.
+                const require = (path) => {
+                    if (path === 'react') return window.React;
+                    if (path === 'react-dom' || path === 'react-dom/client') return window.ReactDOM;
+                    throw new Error(\`Cannot find module '\${path}'. Complex dependencies are not supported in this previewer.\`);
+                };
+
+                const exports = {};
+                const module = { exports };
                 const rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
 
                 if (rawCode.trim()) {
-                    // Transpile TSX to JS, keeping ES module syntax ('import'/'export').
+                    // Transpile TSX to CommonJS-style JavaScript (using 'require').
                     const transpiledCode = Babel.transform(rawCode, {
-                        presets: ['react', 'typescript', ['env', { modules: false }]],
+                        presets: ['react', 'typescript'],
                         filename: 'App.tsx' // For better error messages
                     }).code;
 
-                    // Create a Blob and a URL for the transpiled code to use it in a dynamic import().
-                    const codeBlob = new Blob([transpiledCode], { type: 'text/javascript' });
-                    const codeUrl = URL.createObjectURL(codeBlob);
-                    
-                    // Dynamically import the user's code as an ES module.
-                    // The browser handles resolving 'react', 'react-dom/client', and any CDN URLs.
-                    const { default: App } = await import(codeUrl);
-                    
-                    URL.revokeObjectURL(codeUrl); // Clean up the Blob URL.
+                    // Evaluate the transpiled code within a scope where 'require', 'module', and 'exports' are defined.
+                    eval(transpiledCode);
+
+                    // The main component is expected to be the default export.
+                    const App = module.exports.default;
 
                     if (typeof App !== 'function' && !(App && typeof App.render === 'function')) {
                         throw new Error("The code must export a default React component.");
