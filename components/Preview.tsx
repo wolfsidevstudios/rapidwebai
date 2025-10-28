@@ -10,7 +10,7 @@ interface PreviewProps {
 const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // When new code arrives, the iframe will be reloaded, so we clear the old console messages.
+  // When new code arrives, clear the old console messages as the iframe will reload.
   useEffect(() => {
     clearConsole();
   }, [code, clearConsole]);
@@ -28,105 +28,114 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
     return () => window.removeEventListener('message', handleMessage);
   }, [onConsoleMessage]);
   
-  const escapeForInjection = (codeStr: string) => {
-      // Escape backticks and backslashes for JS template literal, and </script> for HTML.
-      return codeStr
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/<\/script>/g, '<\\/script>');
+  // Safely escape the code to be injected into a JavaScript template literal inside the HTML.
+  const escapeCodeForTemplateLiteral = (codeStr: string) => {
+      return codeStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
   };
 
   // The entire sandbox environment is defined in this HTML string.
-  // It uses Sucrase for fast, in-browser transpilation of TSX.
   const srcDoc = `
+    <!DOCTYPE html>
     <html>
       <head>
         <style>
-          body { margin: 0; background-color: white; color: black; font-family: sans-serif; }
-          #root { height: 100%; width: 100%; }
-          .runtime-error-overlay {
-            position: fixed; inset: 0; background-color: rgba(26, 26, 26, 0.95);
-            color: #ff5555; font-family: 'SF Mono', Consolas, Menlo, monospace;
-            padding: 2rem; overflow: auto; line-height: 1.6; white-space: pre-wrap; z-index: 9999;
+          body { margin: 0; font-family: sans-serif; background-color: white; color: black; }
+          #root { height: 100vh; width: 100vw; }
+          .error-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            box-sizing: border-box;
+            background-color: #1a1a1a;
+            color: #ff5555;
+            font-family: 'SF Mono', Consolas, Menlo, monospace;
+            padding: 2rem;
+            overflow: auto;
+            white-space: pre-wrap;
+            z-index: 9999;
           }
-          .runtime-error-overlay h3 {
-            font-size: 1.25rem; margin-bottom: 1rem;
+          .error-overlay h3 {
+            font-size: 1.25rem; margin-top: 0; margin-bottom: 1rem;
             font-family: system-ui, sans-serif; color: #ff8080;
           }
         </style>
-        <!-- 1. Load Sucrase for fast in-iframe transpilation -->
-        <script src="https://unpkg.com/sucrase/dist/index.js"><\/script>
+        <!-- 1. Load Core Libraries -->
+        <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
       </head>
       <body>
         <div id="root"></div>
-        
-        <!-- 2. Our script transpiles and runs the user's code -->
-        <script type="module">
-          // --- Console Interceptor ---
-          const originalConsole = { ...window.console };
-          const formatArgs = (args) => args.map(arg => arg instanceof Error ? arg.stack || arg.message : typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
-          Object.keys(originalConsole).forEach(key => {
-            if (typeof originalConsole[key] === 'function') {
-              window.console[key] = (...args) => {
-                window.parent.postMessage({ type: 'console', level: key, message: formatArgs(args) }, '*');
-                originalConsole[key](...args);
-              };
+
+        <script type="text/javascript">
+            // --- Console Interceptor ---
+            const originalConsole = { ...window.console };
+            const formatArgs = (args) => args.map(arg => {
+                if (arg instanceof Error) return arg.stack || arg.message;
+                try {
+                    return typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg);
+                } catch (e) {
+                    return 'Unserializable object';
+                }
+            }).join(' ');
+            Object.keys(originalConsole).forEach(key => {
+                if (typeof originalConsole[key] === 'function') {
+                    window.console[key] = (...args) => {
+                        window.parent.postMessage({ type: 'console', level: key, message: formatArgs(args) }, '*');
+                        originalConsole[key](...args);
+                    };
+                }
+            });
+
+            // --- Error Handling ---
+            const handleError = (error) => {
+                console.error(error); // Log to parent console as well
+                const root = document.getElementById('root');
+                if (root) {
+                    const errorStack = error.stack ? error.stack.replace(/<anonymous>:/g, 'App.tsx:') : error.message;
+                    root.innerHTML = \`<div class="error-overlay"><h3>Runtime Error</h3><pre>\${errorStack}</pre></div>\`;
+                }
+            };
+            
+            window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
+            window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
+
+            try {
+                // --- Code Injection and Transpilation ---
+                const rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
+
+                if (rawCode.trim()) {
+                    const transpiledCode = Babel.transform(rawCode, {
+                        presets: ['react', 'typescript', ['env', { modules: 'commonjs' }]],
+                        filename: 'App.tsx' // For better error messages from Babel
+                    }).code;
+
+                    // --- Execution ---
+                    // Shim 'require' to provide the global React/ReactDOM objects to the transpiled code.
+                    const require = (name) => {
+                        if (name === 'react') return window.React;
+                        if (name === 'react-dom/client') return window.ReactDOM;
+                        throw new Error(\`Cannot find module '\${name}'. Only 'react' and 'react-dom/client' are supported.\`);
+                    };
+
+                    const exports = {};
+                    const module = { exports };
+                    
+                    // Execute the transpiled code in a controlled scope to get the exported component.
+                    new Function('require', 'module', 'exports', transpiledCode)(require, module, exports);
+                    
+                    const App = module.exports.default;
+
+                    if (typeof App !== 'function' && !(App && typeof App.render === 'function')) {
+                        throw new Error("The code must export a default React component.");
+                    }
+
+                    // Render the final component into the 'root' div.
+                    const root = ReactDOM.createRoot(document.getElementById('root'));
+                    root.render(React.createElement(App));
+                }
+
+            } catch (err) {
+                handleError(err);
             }
-          });
-
-          // --- Error Handling ---
-          const handleError = (error) => {
-            console.error(error);
-            const errorOverlay = document.createElement('div');
-            errorOverlay.className = 'runtime-error-overlay';
-            errorOverlay.innerHTML = '<h3>Error</h3>' + (error.stack || error.message || 'An unknown error occurred.');
-            // Clear previous content and show the error
-            document.body.innerHTML = ''; 
-            document.body.appendChild(errorOverlay);
-          };
-          
-          window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
-          window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
-
-          // --- Code Execution ---
-          try {
-            const rawCode = \`${escapeForInjection(code)}\`;
-            
-            if (!rawCode.trim()) return;
-
-            // Use Sucrase to transpile. It's fast and preserves ES Modules.
-            const transpiledCode = window.sucrase.transform(rawCode, {
-              transforms: ['typescript', 'jsx'],
-              production: true // for smaller output
-            }).code;
-
-            // Replace bare module specifiers with full CDN URLs for dynamic import.
-            const codeWithAbsoluteImports = (transpiledCode || '')
-              .replace(/from\s+['"]react['"]/g, 'from "https://esm.run/react@18"')
-              .replace(/from\s+['"]react-dom\/client['"]/g, 'from "https://esm.run/react-dom@18/client"');
-
-            // Use a blob URL to import the transpiled code as a sandboxed ES module.
-            const blob = new Blob([codeWithAbsoluteImports], { type: 'text/javascript' });
-            const url = URL.createObjectURL(blob);
-            
-            import(url).then(async (module) => {
-              URL.revokeObjectURL(url); // Clean up blob URL
-              const App = module.default;
-
-              if (typeof App !== 'function') {
-                  throw new Error("The code must export a default React component.");
-              }
-              
-              // Import React/ReactDOM to render the component.
-              const React = await import('https://esm.run/react@18');
-              const { createRoot } = await import('https://esm.run/react-dom@18/client');
-              const root = createRoot(document.getElementById('root'));
-              root.render(React.createElement(App));
-            }).catch(handleError);
-
-          } catch (error) {
-            handleError(error);
-          }
         <\/script>
       </body>
     </html>
@@ -138,7 +147,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
       title="Application Preview"
       srcDoc={srcDoc}
       className="w-full h-full border-0"
-      sandbox="allow-scripts allow-modals allow-forms"
+      sandbox="allow-scripts allow-modals"
     />
   );
 };

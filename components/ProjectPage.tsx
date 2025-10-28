@@ -123,7 +123,8 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const handleSendMessage = async (message: string) => {
         if (!message.trim()) return;
         setIsLoading(true);
-        const newHistory = [...chatHistory, { role: 'user', content: message }];
+        // FIX: Add 'as const' to prevent TypeScript from widening the string literal type of 'role' to 'string', ensuring type compatibility with ChatMessage.
+        const newHistory = [...chatHistory, { role: 'user' as const, content: message }];
         setChatHistory(newHistory);
 
         // Handle initial generation UI
