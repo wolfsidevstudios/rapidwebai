@@ -1,25 +1,30 @@
 import React from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
+import FileExplorer from './FileExplorer';
 
 interface EditorPreviewPanelProps {
+  files: Record<string, string>;
+  activeFile: string;
+  onFileSelect: (path: string) => void;
   fileContent: string;
   onFileContentChange: (value: string) => void;
   bundledCode: string | null;
   error: string | null;
   activeView: 'code' | 'preview';
   onViewChange: (view: 'code' | 'preview') => void;
-  activeFile: string;
 }
 
 const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
+  files,
+  activeFile,
+  onFileSelect,
   fileContent,
   onFileContentChange,
   bundledCode,
   error,
   activeView,
   onViewChange,
-  activeFile
 }) => {
 
   return (
@@ -51,17 +56,24 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({
         
       <div className="flex-grow h-full w-full overflow-hidden">
         {activeView === 'code' ? (
-            <div className="h-full flex flex-col">
-                 <div className="bg-[#2a2a2a] text-gray-400 px-4 py-2 text-sm font-mono border-b border-white/10">
-                    {activeFile}
-                 </div>
-                 <CodeEditor value={fileContent} onChange={onFileContentChange} />
-                 {error && (
-                    <div className="bg-red-900 text-red-200 p-4 overflow-auto text-sm font-mono shrink-0" style={{maxHeight: '150px'}}>
-                        <h3 className="font-bold text-red-100 mb-2">Bundler Error:</h3>
-                        <pre className="whitespace-pre-wrap">{error}</pre>
+            <div className="h-full w-full flex">
+                <div className="w-[250px] h-full bg-[#1e1e1e] border-r border-white/10 shrink-0">
+                    <FileExplorer files={files} activeFile={activeFile} onFileSelect={onFileSelect} />
+                </div>
+                <div className="flex-grow h-full flex flex-col">
+                    <div className="bg-[#2a2a2a] text-gray-400 px-4 py-2 text-sm font-mono border-b border-white/10 shrink-0">
+                        {activeFile}
                     </div>
-                 )}
+                    <div className="flex-grow overflow-auto">
+                        <CodeEditor value={fileContent} onChange={onFileContentChange} />
+                    </div>
+                    {error && (
+                        <div className="bg-red-900 text-red-200 p-4 overflow-auto text-sm font-mono shrink-0" style={{maxHeight: '150px'}}>
+                            <h3 className="font-bold text-red-100 mb-2">Bundler Error:</h3>
+                            <pre className="whitespace-pre-wrap">{error}</pre>
+                        </div>
+                    )}
+                </div>
             </div>
         ) : (
             <div className="h-full w-full p-4">

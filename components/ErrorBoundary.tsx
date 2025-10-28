@@ -1,4 +1,4 @@
-import React, { ErrorInfo, ReactNode, Component } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -9,7 +9,8 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+// FIX: Changed Component to React.Component to ensure the correct base class is extended.
+class ErrorBoundary extends React.Component<Props, State> {
   state: State = {
     hasError: false,
     error: null,
@@ -27,6 +28,7 @@ class ErrorBoundary extends Component<Props, State> {
     // When the children prop changes (e.g., code is updated), reset the error state.
     // This allows the preview to recover from a runtime error once the code is fixed.
     if (prevProps.children !== this.props.children && this.state.hasError) {
+      // FIX: Correctly call this.setState. The error was due to incorrect type inference of the class.
       this.setState({ hasError: false, error: null });
     }
   }
@@ -44,6 +46,7 @@ class ErrorBoundary extends Component<Props, State> {
       );
     }
 
+    // FIX: Correctly access this.props. The error was due to incorrect type inference of the class.
     return this.props.children;
   }
 }

@@ -61,9 +61,9 @@ const Node: React.FC<{ node: TreeNode; onFileSelect: (path: string) => void; act
           </div>
           {isOpen && (
             <div className="pl-4 border-l border-gray-700 ml-2">
-              {Object.values(node.children!)
-                // FIX: Explicitly type sort callback arguments to resolve type inference issue.
-                .sort((a: TreeNode, b: TreeNode) => (a.children && !b.children) ? -1 : (!a.children && b.children) ? 1 : a.name.localeCompare(b.name))
+              {/* FIX: Cast Object.values to TreeNode[] to ensure correct type inference for sort arguments. */}
+              {(Object.values(node.children!) as TreeNode[])
+                .sort((a, b) => (a.children && !b.children) ? -1 : (!a.children && b.children) ? 1 : a.name.localeCompare(b.name))
                 .map(child => <Node key={child.name} node={child} onFileSelect={onFileSelect} activeFile={activeFile} />)
               }
             </div>
@@ -94,9 +94,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files, activeFile, onFileSe
        <div className="text-gray-500 text-xs font-bold uppercase tracking-wider px-2 mb-2">
             Files
        </div>
-      {fileTree.children && Object.values(fileTree.children)
-        // FIX: Explicitly type sort callback arguments to resolve type inference issue.
-        .sort((a: TreeNode, b: TreeNode) => (a.children && !b.children) ? -1 : (!a.children && b.children) ? 1 : a.name.localeCompare(b.name))
+      {fileTree.children && (Object.values(fileTree.children) as TreeNode[])
+        // FIX: Cast Object.values to TreeNode[] to ensure correct type inference for sort arguments.
+        .sort((a, b) => (a.children && !b.children) ? -1 : (!a.children && b.children) ? 1 : a.name.localeCompare(b.name))
         .map(node => <Node key={node.name} node={node} onFileSelect={onFileSelect} activeFile={activeFile} />)}
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Preview from './Preview';
 import type { Project } from '../App';
 
@@ -12,31 +12,28 @@ interface PreviewPageProps {
 const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
     const [bundledCode, setBundledCode] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const esbuildInitialized = useRef(false);
-
-    const initializeEsbuild = async () => {
-        if (esbuildInitialized.current || !esbuild) return;
-        try {
-            await esbuild.initialize({
-                wasmURL: 'https://unpkg.com/esbuild-wasm@0.21.4/esbuild.wasm',
-                worker: true,
-            });
-            esbuildInitialized.current = true;
-        } catch(e) {
-            console.error("Failed to initialize esbuild", e);
-        }
-    };
+    const [isEsbuildInitialized, setIsEsbuildInitialized] = useState(false);
 
     useEffect(() => {
+        const initializeEsbuild = async () => {
+            if (isEsbuildInitialized || !esbuild) return;
+            try {
+                await esbuild.initialize({
+                    wasmURL: 'https://unpkg.com/esbuild-wasm@0.21.4/esbuild.wasm',
+                    worker: true,
+                });
+                setIsEsbuildInitialized(true);
+            } catch(e) {
+                console.error("Failed to initialize esbuild", e);
+                setError("Failed to initialize code bundler. Please refresh the page.");
+            }
+        };
         initializeEsbuild();
-    }, []);
+    }, [isEsbuildInitialized]);
 
     const bundleProject = useCallback(async (projectFiles: Record<string, string>) => {
-        if (!esbuildInitialized.current) {
-            setError('Waiting for bundler to initialize...');
-            setTimeout(() => bundleProject(projectFiles), 1000); // Retry after a second
-            return;
-        }
+        if (!isEsbuildInitialized) return;
+        
         setError(null);
 
         try {
@@ -82,13 +79,13 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
             setError(err.message);
             setBundledCode(null);
         }
-    }, []);
+    }, [isEsbuildInitialized]);
 
     useEffect(() => {
-        if (project.files) {
+        if (project.files && isEsbuildInitialized) {
             bundleProject(project.files);
         }
-    }, [project.files, bundleProject]);
+    }, [project.files, bundleProject, isEsbuildInitialized]);
 
     if (error) {
         return (

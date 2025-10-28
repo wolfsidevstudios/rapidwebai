@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './ChatPanel';
 import EditorPreviewPanel from './EditorPreviewPanel';
-import FileExplorer from './FileExplorer';
 import type { Project } from '../App';
 import { GoogleGenAI } from "@google/genai";
 import PublishModal from './PublishModal';
@@ -41,32 +40,30 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     const [projectName, setProjectName] = useState(project.name);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const esbuildInitialized = useRef(false);
+    const [isEsbuildInitialized, setIsEsbuildInitialized] = useState(false);
+
 
     // --- ESBuild Bundler ---
-    const initializeEsbuild = async () => {
-        if (esbuildInitialized.current || !esbuild) return;
-        try {
-            await esbuild.initialize({
-                wasmURL: 'https://unpkg.com/esbuild-wasm@0.21.4/esbuild.wasm',
-                worker: true,
-            });
-            esbuildInitialized.current = true;
-        } catch(e) {
-            console.error("Failed to initialize esbuild", e);
-        }
-    };
-
     useEffect(() => {
+        const initializeEsbuild = async () => {
+            if (isEsbuildInitialized || !esbuild) return;
+            try {
+                await esbuild.initialize({
+                    wasmURL: 'https://unpkg.com/esbuild-wasm@0.21.4/esbuild.wasm',
+                    worker: true,
+                });
+                setIsEsbuildInitialized(true);
+            } catch(e) {
+                console.error("Failed to initialize esbuild", e);
+                setError("Failed to initialize code bundler. Please refresh the page.");
+            }
+        };
         initializeEsbuild();
-    }, []);
+    }, [isEsbuildInitialized]);
 
     const bundleProject = useCallback(async (projectFiles: Record<string, string>) => {
-        if (!esbuildInitialized.current) {
-            setError('Waiting for bundler to initialize...');
-            setTimeout(() => bundleProject(projectFiles), 1000);
-            return;
-        }
+        if (!isEsbuildInitialized) return;
+        
         setError(null);
 
         try {
@@ -118,11 +115,13 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
             setError(err.message.split('\n').slice(0, 5).join('\n'));
             setBundledCode(null);
         }
-    }, []);
+    }, [isEsbuildInitialized]);
 
     useEffect(() => {
-        bundleProject(files);
-    }, [files, bundleProject]);
+        if (isEsbuildInitialized) {
+            bundleProject(files);
+        }
+    }, [files, bundleProject, isEsbuildInitialized]);
 
     // --- Project State Management ---
     useEffect(() => {
@@ -262,21 +261,20 @@ New file structure (as a JSON object):`;
             </header>
             
             <main className="flex flex-grow text-white min-h-0">
-                <div className="w-[250px] h-full border-r border-white/10 shrink-0">
-                    <FileExplorer files={files} activeFile={activeFile} onFileSelect={setActiveFile} />
-                </div>
-                <div className="flex-grow w-2/5 h-full">
+                <div className="w-2/5 h-full border-r border-white/10">
                     <ChatPanel chatHistory={chatHistory} onSendMessage={handleSendMessage} isLoading={isLoading} selectedApis={selectedApis} onSelectedApisChange={setSelectedApis} />
                 </div>
-                <div className="flex-grow w-3/5 h-full border-l border-white/10">
+                <div className="w-3/5 h-full">
                     <EditorPreviewPanel
+                        files={files}
+                        activeFile={activeFile}
+                        onFileSelect={setActiveFile}
                         fileContent={files[activeFile] || ''}
                         onFileContentChange={handleFileContentChange}
                         bundledCode={bundledCode}
                         error={error}
                         activeView={activeView}
                         onViewChange={setActiveView}
-                        activeFile={activeFile}
                     />
                 </div>
             </main>
