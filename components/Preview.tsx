@@ -1,11 +1,4 @@
-// FIX: Add type declaration for window.Babel, which is loaded via a script tag.
-declare global {
-  interface Window {
-    Babel: any;
-  }
-}
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { ConsoleMessage } from './EditorPreviewPanel';
 
 interface PreviewProps {
@@ -15,41 +8,14 @@ interface PreviewProps {
 }
 
 const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole }) => {
-  const [status, setStatus] = useState('initializing');
-  const [error, setError] = useState<string | null>(null);
-  const [transpiledCode, setTranspiledCode] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // When new code arrives, the iframe will be reloaded, so we clear the old console messages.
   useEffect(() => {
-    const transpile = async () => {
-      try {
-        if (!window.Babel) {
-          setStatus('initializing');
-          return;
-        }
-        setStatus('transpiling');
-        clearConsole();
-
-        // Transpile TSX to JS, keeping ES module syntax (import/export)
-        const result = await window.Babel.transform(code, {
-          presets: ['react', 'typescript'],
-          filename: 'App.tsx',
-          sourceMaps: 'inline',
-        }).code;
-        
-        setTranspiledCode(result || '');
-        setError(null);
-        setStatus('ready');
-      } catch (err: any) {
-        setError(err.message);
-        setStatus('error');
-        onConsoleMessage({ type: 'error', message: err.message, timestamp: new Date() });
-      }
-    };
-    transpile();
-  }, [code, clearConsole, onConsoleMessage]);
+    clearConsole();
+  }, [code, clearConsole]);
   
-  // Set up console message listener for the iframe.
+  // Set up a listener to receive console messages from the iframe.
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
@@ -62,11 +28,13 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
     return () => window.removeEventListener('message', handleMessage);
   }, [onConsoleMessage]);
   
-  const escapeCode = (codeStr: string) => {
-    return codeStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  // We need to escape closing script tags to prevent the HTML from breaking.
+  const escapeForScriptTag = (codeStr: string) => {
+      return codeStr.replace(/<\/script>/g, '<\\/script>');
   };
-  
-  // This is the new, module-based sandbox environment for the iframe.
+
+  // The entire sandbox environment is defined in this HTML string.
+  // It now includes Babel and performs transpilation right before execution.
   const srcDoc = `
     <html>
       <head>
@@ -76,13 +44,15 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
           .runtime-error-overlay {
             position: fixed; inset: 0; background-color: rgba(26, 26, 26, 0.95);
             color: #ff5555; font-family: 'SF Mono', Consolas, Menlo, monospace;
-            padding: 2rem; overflow: auto; line-height: 1.6; white-space: pre-wrap;
+            padding: 2rem; overflow: auto; line-height: 1.6; white-space: pre-wrap; z-index: 9999;
           }
           .runtime-error-overlay h3 {
             font-size: 1.25rem; margin-bottom: 1rem;
             font-family: system-ui, sans-serif; color: #ff8080;
           }
         </style>
+        <!-- 1. Load Babel for in-iframe transpilation -->
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
         <script type="importmap">
         {
           "imports": {
@@ -90,10 +60,17 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             "react-dom/client": "https://esm.run/react-dom@18/client"
           }
         }
-        </script>
+        <\/script>
       </head>
       <body>
         <div id="root"></div>
+        
+        <!-- 2. The user's raw TSX code is placed here -->
+        <script type="text/babel" data-type="module" id="user-code">
+          ${escapeForScriptTag(code)}
+        <\/script>
+        
+        <!-- 3. Our script transpiles and runs the user's code -->
         <script type="module">
           // --- Console Interceptor ---
           const originalConsole = { ...window.console };
@@ -110,59 +87,56 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
           // --- Error Handling ---
           const handleError = (error) => {
             console.error(error);
-            document.body.innerHTML = '<div class="runtime-error-overlay"><h3>Runtime Error</h3>' + (error.stack || error.message) + '</div>';
+            const errorOverlay = document.createElement('div');
+            errorOverlay.className = 'runtime-error-overlay';
+            errorOverlay.innerHTML = '<h3>Error</h3>' + (error.message || 'An unknown error occurred.');
+            // Clear previous content and show the error
+            document.body.innerHTML = ''; 
+            document.body.appendChild(errorOverlay);
           };
           
           window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
           window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
 
           // --- Code Execution ---
-          (async () => {
-            try {
-              const codeToRun = \`${escapeCode(transpiledCode)}\`;
-              if (!codeToRun.trim()) return;
+          try {
+            const userCodeEl = document.getElementById('user-code');
+            const rawCode = userCodeEl.textContent;
+            
+            if (!rawCode.trim()) return;
 
-              // Use a blob URL to import the user's code as an ES module.
-              // This supports top-level imports from CDNs (like esm.run) inside the code.
-              const blob = new Blob([codeToRun], { type: 'text/javascript' });
-              const url = URL.createObjectURL(blob);
-              const module = await import(url);
+            // Use Babel to transpile the code on the fly
+            const transpiledCode = Babel.transform(rawCode, {
+              presets: ['react', 'typescript'],
+              filename: 'App.tsx'
+            }).code;
+
+            // Use a blob URL to import the transpiled code as an ES module
+            const blob = new Blob([transpiledCode], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            
+            import(url).then(async (module) => {
               URL.revokeObjectURL(url); // Clean up
-
               const App = module.default;
+
               if (typeof App !== 'function') {
                   throw new Error("The code must export a default React component.");
               }
               
-              // Import React and ReactDOM to render the app.
               const React = await import('react');
               const { createRoot } = await import('react-dom/client');
-
               const root = createRoot(document.getElementById('root'));
               root.render(React.createElement(App));
+            }).catch(handleError);
 
-            } catch (error) {
-              handleError(error);
-            }
-          })();
-        </script>
+          } catch (error) {
+            handleError(error);
+          }
+        <\/script>
       </body>
     </html>
   `;
-
-  if (status === 'error') {
-    return (
-      <div className="p-4 m-4 bg-red-100 border-l-4 border-red-500 text-red-800 font-mono">
-        <h3 className="font-bold font-sans mb-2">Transpilation Error</h3>
-        <pre className="whitespace-pre-wrap">{error}</pre>
-      </div>
-    );
-  }
-
-  if (status !== 'ready') {
-    return <div className="flex items-center justify-center h-full text-gray-500">{status === 'initializing' ? 'Initializing transpiler...' : 'Transpiling code...'}</div>;
-  }
-
+  
   return (
     <iframe
       ref={iframeRef}
