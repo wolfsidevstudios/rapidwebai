@@ -141,10 +141,10 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 
 **Instructions for the Response:**
 1.  **SINGLE FILE ONLY**: Your entire output MUST be a single block of TSX code for a React component. Do NOT use markdown formatting like \`\`\`tsx.
-2.  **SELF-CONTAINED**: All components, logic, and styling must be included in this single file. Do NOT use local \`import\` statements (e.g., \`import MyComponent from './MyComponent'\`).
-3.  **STYLING**: Use inline styles (e.g., \`style={{ color: 'blue' }}\`) or include a \`<style>\` tag as a string within your main component.
+2.  **SELF-CONTAINED**: All components and logic must be included in this single file. Do NOT use local \`import\` statements (e.g., \`import MyComponent from './MyComponent'\`).
+3.  **STYLING**: Use Tailwind CSS classes directly in your JSX (e.g., \`className="text-blue-500"\`). The Tailwind CDN is available automatically. You can also use inline styles for dynamic styling or include a \`<style>\` tag as a string for more complex styles.
 4.  **ROUTING**: To create multiple pages, use React state. Do not use libraries like 'react-router-dom'. Manage the current page in state and conditionally render components.
-5.  **EXTERNAL LIBRARIES**: You can use third-party libraries. The preview environment is configured to resolve the following libraries automatically: \`react\`, \`react-dom\`, \`framer-motion\`, \`d3\`, \`chart.js\`, \`react-chartjs-2\`, \`axios\`, \`clsx\`, \`lodash\`, \`date-fns\`, and \`canvas-confetti\`. You can import them using bare specifiers (e.g., \`import { motion } from 'framer-motion';\`). For any other library not on this list, you MUST import it using its full CDN URL from a provider like 'esm.run' (e.g., \`import Icon from 'https://esm.run/react-feather/dist/icons/x';\`).
+5.  **EXTERNAL LIBRARIES**: Do NOT use any external libraries or \`import\` statements. React is available automatically.
 6.  **ENTRY POINT**: The main component must be the default export. (e.g., \`export default App;\`)
 
 **Current Code:**
