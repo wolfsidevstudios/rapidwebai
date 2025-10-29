@@ -122,12 +122,17 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             // --- ES Module based execution logic ---
             const renderApp = async () => {
               try {
-                  const rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
+                  let rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
                   if (!rawCode.trim()) return;
 
-                  // Transpile TSX to ES Module JavaScript
+                  // Ensure React is imported for the classic JSX runtime.
+                  if (!/import\\s+React/.test(rawCode)) {
+                      rawCode = "import React from 'react';\\n" + rawCode;
+                  }
+
+                  // Transpile TSX to ES Module JavaScript using the classic runtime.
                   const transpiledCode = Babel.transform(rawCode, {
-                      presets: ['react', 'typescript'],
+                      presets: [['react', { runtime: 'classic' }], 'typescript'],
                       filename: 'App.tsx'
                   }).code;
                   

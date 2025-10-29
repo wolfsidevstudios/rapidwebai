@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
-import useDebounce from '../hooks/useDebounce';
 import GeneratingPreview, { Suggestion } from './GeneratingPreview';
 
 export interface ConsoleMessage {
@@ -47,7 +46,6 @@ const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => 
 const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeChange, isGeneratingInitial, suggestions, onAddToChat, initialPrompt }) => {
   const [activeView, setActiveView] = useState<'preview' | 'code' | 'console'>('preview');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
-  const debouncedCode = useDebounce(code, 500);
 
   const handleConsoleMessage = useCallback((message: ConsoleMessage) => {
     setConsoleMessages(prev => [...prev, message]);
@@ -59,7 +57,7 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeCha
     if (isGeneratingInitial) {
       return <GeneratingPreview suggestions={suggestions} onAddToChat={onAddToChat} initialPrompt={initialPrompt} />;
     }
-    return <Preview code={debouncedCode} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
+    return <Preview code={code} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
   };
 
   return (
