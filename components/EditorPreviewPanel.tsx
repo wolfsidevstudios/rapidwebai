@@ -46,7 +46,7 @@ const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => 
 
 const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesChange, isGeneratingInitial, suggestions, onAddToChat, initialPrompt }) => {
   const [activeView, setActiveView] = useState<'preview' | 'code' | 'console'>('preview');
-  const [activeFile, setActiveFile] = useState('pages/index.tsx');
+  const [activeFile, setActiveFile] = useState('index.html');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
 
   const handleConsoleMessage = useCallback((message: ConsoleMessage) => {
@@ -61,7 +61,7 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesC
   
   // Ensure activeFile always exists in files
   if (!files[activeFile]) {
-      const firstFile = Object.keys(files)[0] || 'pages/index.tsx';
+      const firstFile = Object.keys(files)[0] || 'index.html';
       if(activeFile !== firstFile) {
         setActiveFile(firstFile);
       }
@@ -71,9 +71,7 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesC
     if (isGeneratingInitial) {
       return <GeneratingPreview suggestions={suggestions} onAddToChat={onAddToChat} initialPrompt={initialPrompt} />;
     }
-    // Only attempt to render .tsx files. For others, show a message.
-    const codeToPreview = (activeFile.endsWith('.tsx') || activeFile.endsWith('.jsx')) ? files[activeFile] : `// Cannot preview this file type`;
-    return <Preview code={codeToPreview || ''} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
+    return <Preview files={files} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
   };
 
   return (

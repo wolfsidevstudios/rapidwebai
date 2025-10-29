@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './ChatPanel';
 import EditorPreviewPanel from './EditorPreviewPanel';
@@ -21,15 +19,25 @@ const CheckIcon: React.FC = () => (
     </svg>
 );
 
-const codeGenerationPrompt = (currentFiles: object, message: string, selectedApis: string[]) => `You are an expert web developer specializing in Next.js, Tailwind CSS, and TypeScript.
-Your task is to modify a set of project files based on a user's request.
-The user wants to build a web application.
+const codeGenerationPrompt = (currentFiles: object, message: string, selectedApis: string[]) => `You are an expert web developer specializing in vanilla HTML, CSS, and JavaScript.
+Your task is to create or modify a set of project files for a standalone web application based on a user's request.
+The app should not use any frameworks like React, Vue, or Angular. It must be self-contained in 'index.html', 'style.css', and 'script.js'.
 
 **PWA & OFFLINE SUPPORT:**
-This is a Progressive Web App (PWA) project configured with the 'next-pwa' plugin. The goal is to make the application fully offline-capable.
-- The service worker and caching for static assets are handled automatically by 'next-pwa'. You DO NOT need to create or modify service worker files.
-- Your primary PWA-related task is to update 'public/manifest.json'. Modify the 'name', 'short_name', and 'description' fields to be relevant to the user's request. You can also update 'theme_color' and 'background_color' if appropriate.
-- For applications that fetch data (e.g., from an API), implement a strategy to make this data available offline. A good approach is to cache API responses using localStorage or IndexedDB. When the app is offline, retrieve data from the cache. When online, fetch fresh data and update the cache.
+This is a Progressive Web App (PWA) project. The goal is to make the application fully offline-capable.
+- You must provide a 'manifest.json' file. Modify the 'name', 'short_name', and 'description' fields to be relevant to the user's request.
+- You must provide a service worker file, 'sw.js', that caches the core application files ('index.html', 'style.css', 'script.js').
+- The 'index.html' file should correctly link to the manifest and register the 'sw.js' service worker.
+
+**CORE REQUIREMENT: FULL FUNCTIONALITY**
+The generated code must be fully functional. This is critical.
+For interactive applications (like a to-do list, forms, calculators, etc.), the 'script.js' file must contain all the necessary client-side logic.
+This includes:
+- Selecting DOM elements.
+- Adding event listeners (e.g., for button clicks, form submissions).
+- Manipulating the DOM to add, remove, or update content dynamically.
+- Managing application state (e.g., in an array for a to-do list).
+The application must be interactive and usable as described in the user's request.
 
 Current project files:
 ${JSON.stringify(currentFiles, null, 2)}
@@ -40,18 +48,16 @@ ${selectedApis.length > 0 ? `The user has enabled the following APIs: ${selected
 
 Analyze the user's request and the current file structure.
 Generate a complete and updated set of files to fulfill the request.
-The main page to display is 'pages/index.tsx'. Ensure it is fully functional and styled.
-The generated code must be fully functional. For interactive applications (like a to-do list, forms, etc.), ensure all client-side logic is implemented correctly (e.g., state management with React hooks for adding, deleting, and updating data) so the application is interactive and usable.
 Do not truncate code or use placeholders like \`// ...\`. Provide the complete, runnable code for each file.
-If you need to add dependencies, update package.json.
 Your response MUST be a JSON object with file paths as keys and their full content as string values.
-You must return all project files, including 'package.json', 'next.config.js', 'public/manifest.json', etc., even if they are unchanged.
+You must return all project files ('index.html', 'style.css', 'script.js', 'manifest.json', 'sw.js'), even if they are unchanged.
 Example response format:
 {
-  "pages/index.tsx": "...",
-  "styles/globals.css": "...",
-  "package.json": "...",
-  "public/manifest.json": "..."
+  "index.html": "<!DOCTYPE html>...",
+  "style.css": "body { ... }",
+  "script.js": "document.addEventListener...",
+  "manifest.json": "{ ... }",
+  "sw.js": "self.addEventListener..."
 }
 `;
 
@@ -148,24 +154,18 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        "pages/index.tsx": { type: Type.STRING },
-                        "styles/globals.css": { type: Type.STRING },
-                        "package.json": { type: Type.STRING },
-                        "tailwind.config.js": { type: Type.STRING },
-                        "next.config.js": { type: Type.STRING },
-                        "public/manifest.json": { type: Type.STRING },
-                        "pages/_document.tsx": { type: Type.STRING },
-                        "pages/_app.tsx": { type: Type.STRING },
+                        "index.html": { type: Type.STRING },
+                        "style.css": { type: Type.STRING },
+                        "script.js": { type: Type.STRING },
+                        "manifest.json": { type: Type.STRING },
+                        "sw.js": { type: Type.STRING },
                     },
                     required: [
-                        "pages/index.tsx", 
-                        "styles/globals.css", 
-                        "package.json", 
-                        "tailwind.config.js",
-                        "next.config.js",
-                        "public/manifest.json",
-                        "pages/_document.tsx",
-                        "pages/_app.tsx"
+                        "index.html", 
+                        "style.css", 
+                        "script.js",
+                        "manifest.json",
+                        "sw.js"
                     ],
                     additionalProperties: { type: Type.STRING }
                 },
@@ -227,24 +227,18 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                     responseSchema: {
                         type: Type.OBJECT,
                         properties: {
-                            "pages/index.tsx": { type: Type.STRING },
-                            "styles/globals.css": { type: Type.STRING },
-                            "package.json": { type: Type.STRING },
-                            "tailwind.config.js": { type: Type.STRING },
-                            "next.config.js": { type: Type.STRING },
-                            "public/manifest.json": { type: Type.STRING },
-                            "pages/_document.tsx": { type: Type.STRING },
-                            "pages/_app.tsx": { type: Type.STRING },
+                            "index.html": { type: Type.STRING },
+                            "style.css": { type: Type.STRING },
+                            "script.js": { type: Type.STRING },
+                            "manifest.json": { type: Type.STRING },
+                            "sw.js": { type: Type.STRING },
                         },
                         required: [
-                            "pages/index.tsx", 
-                            "styles/globals.css", 
-                            "package.json", 
-                            "tailwind.config.js",
-                            "next.config.js",
-                            "public/manifest.json",
-                            "pages/_document.tsx",
-                            "pages/_app.tsx"
+                            "index.html", 
+                            "style.css", 
+                            "script.js",
+                            "manifest.json",
+                            "sw.js"
                         ],
                         additionalProperties: { type: Type.STRING }
                     },
@@ -311,7 +305,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 
     return (
         <div className="h-full w-full flex bg-black relative">
-            <div className="w-[450px] h-full border-r border-white/10 flex-shrink-0">
+            <div className="w-[450px] h-full border-r border-white/10 flex-shrink-0 rounded-l-3xl overflow-hidden">
                 <ChatPanel
                     chatHistory={chatHistory}
                     onSendMessage={onSendMessage}
@@ -322,7 +316,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                     onChatInputChange={setChatInput}
                 />
             </div>
-            <div className="flex-grow h-full">
+            <div className="flex-grow h-full rounded-r-3xl overflow-hidden">
                 <EditorPreviewPanel
                     files={files}
                     onFilesChange={setFiles}
