@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ConsoleMessage } from './EditorPreviewPanel';
 
 interface PreviewProps {
@@ -7,31 +7,107 @@ interface PreviewProps {
   clearConsole: () => void;
 }
 
+const workerScript = `
+  // Inlined Web Worker script for Babel transpilation
+  self.importScripts("https://unpkg.com/@babel/standalone/babel.min.js");
+
+  self.onmessage = (event) => {
+    const { code } = event.data;
+    try {
+      if (!code || !code.trim()) {
+        self.postMessage({ type: 'success', code: '' });
+        return;
+      }
+      
+      let rawCode = code;
+      // Pre-process code: Ensure React is imported for the classic runtime.
+      if (!/import\\s+React/.test(rawCode)) {
+        rawCode = "import React from 'react';\\n" + rawCode;
+      }
+
+      // Transpile TSX to ES Module JavaScript using Babel.
+      const transpiledCode = Babel.transform(rawCode, {
+        presets: [
+          ['react', { runtime: 'classic' }], 
+          ['typescript', { isTSX: true, allExtensions: true }]
+        ],
+        filename: 'App.tsx' // For better error messages
+      }).code;
+
+      self.postMessage({ type: 'success', code: transpiledCode });
+    } catch (error) {
+      // Errors can't be cloned, so we serialize it.
+      self.postMessage({ 
+        type: 'error', 
+        error: { 
+          message: error.message, 
+          stack: error.stack,
+          name: error.name
+        } 
+      });
+    }
+  };
+`;
+
 const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const [isIframeReady, setIsIframeReady] = useState(false);
 
-  // When new code arrives, clear the old console messages as the iframe will reload.
+  // 1. Initialize and terminate the transpilation worker
   useEffect(() => {
-    clearConsole();
-  }, [code, clearConsole]);
-  
-  // Set up a listener to receive console messages from the iframe.
+    const blob = new Blob([workerScript], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+    workerRef.current = worker;
+
+    worker.onmessage = (event) => {
+      const { type, code: transpiledCode, error } = event.data;
+      if (iframeRef.current?.contentWindow) {
+        if (type === 'success') {
+          iframeRef.current.contentWindow.postMessage({ type: 'render', code: transpiledCode }, '*');
+        } else if (type === 'error') {
+          iframeRef.current.contentWindow.postMessage({ type: 'display-error', error: error, errorType: 'Transpilation Error' }, '*');
+        }
+      }
+    };
+    
+    URL.revokeObjectURL(workerUrl);
+
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []); // Empty dependency array ensures this runs only once
+
+  // 2. Listen for messages from the iframe (console logs, ready signal)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       const { type, level, message } = event.data;
+
       if (type === 'console') {
         onConsoleMessage({ type: level, message, timestamp: new Date() });
+      } else if (type === 'iframe-ready') {
+        setIsIframeReady(true);
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [onConsoleMessage]);
-  
-  // Safely escape the code to be injected into a JavaScript template literal inside the HTML.
-  const escapeCodeForTemplateLiteral = (codeStr: string) => {
-      return codeStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
-  };
+
+  // 3. When code changes or iframe is ready, trigger transpilation
+  useEffect(() => {
+    clearConsole();
+    if (iframeRef.current?.contentWindow) {
+        // Clear previous errors in the iframe
+        iframeRef.current.contentWindow.postMessage({ type: 'clear' }, '*');
+    }
+    
+    if (workerRef.current && isIframeReady) {
+      workerRef.current.postMessage({ code });
+    }
+  }, [code, isIframeReady, clearConsole]);
 
   const srcDoc = `
     <!DOCTYPE html>
@@ -121,8 +197,6 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             word-break: break-word;
           }
         </style>
-        <!-- Babel for TSX transpilation -->
-        <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
         
         <!-- Import Map for dependencies -->
         <script type="importmap">
@@ -171,80 +245,70 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             const ERROR_TITLE_ID = 'error-title';
             const ERROR_MESSAGE_ID = 'error-message';
 
+            // --- Element Refs ---
+            const rootEl = document.getElementById(ROOT_ID);
+            const loaderEl = document.getElementById(LOADER_ID);
+            const errorOverlayEl = document.getElementById(ERROR_OVERLAY_ID);
+
             // --- Main Execution ---
-            (async function main() {
-              setupConsoleInterceptor();
-              setupGlobalErrorHandlers();
-              await transpileAndRender();
-            })();
+            setupConsoleInterceptor();
+            setupGlobalErrorHandlers();
+            
+            window.addEventListener('message', handleParentMessage);
 
+            // Notify parent that the iframe is ready to receive code
+            window.parent.postMessage({ type: 'iframe-ready' }, '*');
+            
             // --- Core Functions ---
+            async function handleParentMessage(event) {
+              // Important: Check the origin in a real production app
+              if (event.source !== window.parent) return;
 
-            /**
-             * Transpiles and renders the user's React code.
-             */
-            async function transpileAndRender() {
-              const loader = document.getElementById(LOADER_ID);
-              const rootEl = document.getElementById(ROOT_ID);
-              const errorOverlay = document.getElementById(ERROR_OVERLAY_ID);
+              const { type, code, error, errorType } = event.data;
 
-              // 1. Prepare UI for new render
-              loader.style.display = 'flex';
-              rootEl.innerHTML = ''; 
-              errorOverlay.style.display = 'none';
+              if (type === 'render') {
+                await render(code);
+              } else if (type === 'display-error') {
+                displayError(error, errorType);
+              } else if (type === 'clear') {
+                // Prepare UI for new render
+                loaderEl.style.display = 'flex';
+                rootEl.innerHTML = ''; 
+                errorOverlayEl.style.display = 'none';
+              }
+            }
 
+            async function render(transpiledCode) {
               try {
-                let rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
-                if (!rawCode.trim()) {
-                  loader.style.display = 'none';
+                if (!transpiledCode) {
+                  loaderEl.style.display = 'none';
                   return; // Don't render if code is empty
                 }
 
-                // 2. Pre-process code: Ensure React is imported for the classic runtime.
-                if (!/import\\s+React/.test(rawCode)) {
-                  rawCode = "import React from 'react';\\n" + rawCode;
-                }
-
-                // 3. Transpile TSX to ES Module JavaScript using Babel.
-                const transpiledCode = Babel.transform(rawCode, {
-                  presets: [
-                    ['react', { runtime: 'classic' }], 
-                    ['typescript', { isTSX: true, allExtensions: true }]
-                  ],
-                  filename: 'App.tsx' // For better error messages
-                }).code;
-                
-                // 4. Import the transpiled code as a module using a Blob URL.
+                // Import the transpiled code as a module using a Blob URL.
                 const blob = new Blob([transpiledCode], { type: 'text/javascript' });
                 const url = URL.createObjectURL(blob);
                 const { default: App } = await import(url);
                 URL.revokeObjectURL(url); // Clean up the Blob URL
 
-                // 5. Validate the imported module.
                 if (typeof App !== 'function' && !(App && typeof App.render === 'function')) {
                   throw new Error("The code must have a default export that is a React component.");
                 }
                 
-                // 6. Render the React application.
+                // Render the React application.
                 const React = await import('react');
                 const ReactDOM = await import('react-dom/client');
                 const root = ReactDOM.createRoot(rootEl);
                 root.render(React.createElement(App));
 
               } catch (err) {
-                const errorType = err.name === 'SyntaxError' ? 'Transpilation Error' : 'Runtime Error';
-                displayError(err, errorType);
+                displayError(err, 'Runtime Error');
               } finally {
-                // 7. Hide loader after rendering or error.
-                loader.style.display = 'none';
+                loaderEl.style.display = 'none';
               }
             }
             
             // --- Utility Functions ---
-
-            /**
-             * Sets up global error handlers to catch any uncaught exceptions.
-             */
             function setupGlobalErrorHandlers() {
               window.addEventListener('error', (event) => { 
                 event.preventDefault(); 
@@ -256,9 +320,6 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
               });
             }
 
-            /**
-             * Intercepts console methods to forward logs to the parent window.
-             */
             function setupConsoleInterceptor() {
               const originalConsole = { ...console };
               const formatArgs = (args) => args.map(arg => {
@@ -278,13 +339,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
               });
             }
 
-            /**
-             * Displays a formatted error in the overlay.
-             * @param {Error} error - The error object.
-             * @param {string} type - The type of error (e.g., 'Runtime Error').
-             */
             function displayError(error, type) {
-              const errorOverlay = document.getElementById(ERROR_OVERLAY_ID);
               const errorTitle = document.getElementById(ERROR_TITLE_ID);
               const errorMessage = document.getElementById(ERROR_MESSAGE_ID);
               
@@ -294,7 +349,8 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
 
               errorTitle.textContent = type;
               errorMessage.textContent = error.message + '\\n\\n' + cleanStack;
-              errorOverlay.style.display = 'block';
+              errorOverlayEl.style.display = 'block';
+              loaderEl.style.display = 'none';
             }
         <\/script>
       </body>
@@ -307,7 +363,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
       title="Application Preview"
       srcDoc={srcDoc}
       className="w-full h-full border-0 bg-gray-100"
-      sandbox="allow-scripts allow-modals allow-same-origin"
+      sandbox="allow-scripts allow-modals"
     />
   );
 };
