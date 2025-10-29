@@ -25,12 +25,18 @@ const codeGenerationPrompt = (currentFiles: object, message: string, selectedApi
 Your task is to modify a set of project files based on a user's request.
 The user wants to build a web application.
 
+**PWA & OFFLINE SUPPORT:**
+This is a Progressive Web App (PWA) project configured with the 'next-pwa' plugin. The goal is to make the application fully offline-capable.
+- The service worker and caching for static assets are handled automatically by 'next-pwa'. You DO NOT need to create or modify service worker files.
+- Your primary PWA-related task is to update 'public/manifest.json'. Modify the 'name', 'short_name', and 'description' fields to be relevant to the user's request. You can also update 'theme_color' and 'background_color' if appropriate.
+- For applications that fetch data (e.g., from an API), implement a strategy to make this data available offline. A good approach is to cache API responses using localStorage or IndexedDB. When the app is offline, retrieve data from the cache. When online, fetch fresh data and update the cache.
+
 Current project files:
 ${JSON.stringify(currentFiles, null, 2)}
 
 User's request: "${message}"
 
-${selectedApis.length > 0 ? `The user has enabled the following APIs: ${selectedApis.join(', ')}. You can use them if needed.` : ''}
+${selectedApis.length > 0 ? `The user has enabled the following APIs: ${selectedApis.join(', ')}. You can use them if needed. Ensure that data fetched from these APIs is cached for offline use.` : ''}
 
 Analyze the user's request and the current file structure.
 Generate a complete and updated set of files to fulfill the request.
@@ -39,12 +45,13 @@ The generated code must be fully functional. For interactive applications (like 
 Do not truncate code or use placeholders like \`// ...\`. Provide the complete, runnable code for each file.
 If you need to add dependencies, update package.json.
 Your response MUST be a JSON object with file paths as keys and their full content as string values.
-Do not omit any files, even if they are unchanged. Return the complete project structure.
+You must return all project files, including 'package.json', 'next.config.js', 'public/manifest.json', etc., even if they are unchanged.
 Example response format:
 {
   "pages/index.tsx": "...",
   "styles/globals.css": "...",
-  "package.json": "..."
+  "package.json": "...",
+  "public/manifest.json": "..."
 }
 `;
 
@@ -118,7 +125,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         setChatHistory(newHistory);
 
         try {
-            // FIX: The GoogleGenAI class is imported and should not be accessed from the window object.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const model = 'gemini-2.5-pro';
             const currentFiles = files;
@@ -139,7 +145,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 
             const config: any = {
                 responseMimeType: "application/json",
-                // FIX: `additionalProperties` should be inside `responseSchema` for correct JSON schema validation.
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
@@ -147,9 +152,21 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                         "styles/globals.css": { type: Type.STRING },
                         "package.json": { type: Type.STRING },
                         "tailwind.config.js": { type: Type.STRING },
+                        "next.config.js": { type: Type.STRING },
+                        "public/manifest.json": { type: Type.STRING },
+                        "pages/_document.tsx": { type: Type.STRING },
+                        "pages/_app.tsx": { type: Type.STRING },
                     },
-                    required: ["pages/index.tsx", "styles/globals.css", "package.json", "tailwind.config.js"],
-                    // Allow additional properties for any other files created
+                    required: [
+                        "pages/index.tsx", 
+                        "styles/globals.css", 
+                        "package.json", 
+                        "tailwind.config.js",
+                        "next.config.js",
+                        "public/manifest.json",
+                        "pages/_document.tsx",
+                        "pages/_app.tsx"
+                    ],
                     additionalProperties: { type: Type.STRING }
                 },
             };
@@ -187,7 +204,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
             setInitialPrompt(userMessage.content);
             
             try {
-                // FIX: The GoogleGenAI class is imported and should not be accessed from the window object.
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 const model = 'gemini-2.5-pro';
                 const currentFiles = project.files;
@@ -208,7 +224,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 
                 const config: any = {
                     responseMimeType: "application/json",
-                    // FIX: `additionalProperties` should be inside `responseSchema` for correct JSON schema validation.
                     responseSchema: {
                         type: Type.OBJECT,
                         properties: {
@@ -216,8 +231,21 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                             "styles/globals.css": { type: Type.STRING },
                             "package.json": { type: Type.STRING },
                             "tailwind.config.js": { type: Type.STRING },
+                            "next.config.js": { type: Type.STRING },
+                            "public/manifest.json": { type: Type.STRING },
+                            "pages/_document.tsx": { type: Type.STRING },
+                            "pages/_app.tsx": { type: Type.STRING },
                         },
-                        required: ["pages/index.tsx", "styles/globals.css", "package.json", "tailwind.config.js"],
+                        required: [
+                            "pages/index.tsx", 
+                            "styles/globals.css", 
+                            "package.json", 
+                            "tailwind.config.js",
+                            "next.config.js",
+                            "public/manifest.json",
+                            "pages/_document.tsx",
+                            "pages/_app.tsx"
+                        ],
                         additionalProperties: { type: Type.STRING }
                     },
                 };
