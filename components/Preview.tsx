@@ -163,7 +163,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
       title="Application Preview"
       srcDoc={srcDoc}
       className="w-full h-full border-0"
-      sandbox="allow-scripts allow-modals"
+      sandbox="allow-scripts allow-modals allow-same-origin"
     />
   );
 };
