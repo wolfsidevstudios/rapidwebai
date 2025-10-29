@@ -13,6 +13,7 @@ import Sidebar from './components/Sidebar';
 export interface ChatMessage {
   role: 'user' | 'model';
   content: string;
+  image?: string; // base64 data URL
 }
 
 export interface UserProfile {
@@ -23,7 +24,7 @@ export interface UserProfile {
 
 export interface Project {
   id: string;
-  name: string;
+  name:string;
   code: string; // Changed from 'files'
   chatHistory: ChatMessage[];
   createdAt: number;
@@ -112,7 +113,7 @@ const App: React.FC = () => {
   };
 
   // --- Project Management ---
-  const handleCreateNewProject = useCallback((prompt: string) => {
+  const handleCreateNewProject = useCallback((prompt: string, image?: string) => {
     if (!user) {
         alert("Please log in to create a project.");
         // @ts-ignore
@@ -145,19 +146,31 @@ function App() {
 
 export default App;
 `;
+    const initialChatHistory: ChatMessage[] = [];
+    if (prompt || image) {
+        initialChatHistory.push({
+            role: 'user',
+            content: prompt,
+            image: image,
+        });
+    }
+
     const newProject: Project = {
         id: `proj-${Date.now()}`,
-        name: prompt.substring(0, 50) || 'New Project',
+        name: prompt.substring(0, 50) || 'New Visual Project',
         code: defaultCode,
-        chatHistory: [],
+        chatHistory: initialChatHistory,
         createdAt: Date.now(),
     };
     setProjects(prev => [...prev, newProject]);
     setPendingNavigationProjectId(newProject.id);
     
-    setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('startProjectWithMessage', { detail: { projectId: newProject.id, message: prompt } }));
-    }, 100);
+    // The message is now pre-loaded in chat history, so we just need to trigger the AI processing
+    if (initialChatHistory.length > 0) {
+        setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('startProjectWithMessage', { detail: { projectId: newProject.id } }));
+        }, 100);
+    }
   }, [user]);
 
   useEffect(() => {

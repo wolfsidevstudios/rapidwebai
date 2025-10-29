@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { UserProfile } from '../App';
+import ImageGenerationModal from './ImageGenerationModal';
 
 const UpArrowIcon = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -9,9 +10,15 @@ const UpArrowIcon = () => (
     </svg>
 );
 
+const ImageIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-500 group-hover:text-blue-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+);
+
 
 interface HomePageProps {
-  onStart: (prompt: string) => void;
+  onStart: (prompt: string, image?: string) => void;
 }
 
 const commands = [
@@ -47,6 +54,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
   const [showCommands, setShowCommands] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const filteredCommands = commandQuery
@@ -106,11 +114,20 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
     }
   };
 
+  const handleStartWithImage = (imagePrompt: string, imageData: string) => {
+    onStart(imagePrompt, imageData);
+  };
+
   return (
     <div 
         className="relative h-full w-full bg-cover bg-center" 
         style={{ backgroundImage: "url('https://i.ibb.co/tTjwPg3Y/Google-AI-Studio-2025-10-27-T21-45-49-645-Z.png')" }}
     >
+      <ImageGenerationModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        onAddToChat={handleStartWithImage}
+      />
       <div className="flex flex-col items-center justify-center h-full w-full bg-black/10">
         <div className="text-center mb-12">
             <h1 className="text-6xl font-extrabold text-white" style={{textShadow: '0 4px 15px rgba(0,0,0,0.5)'}}>
@@ -145,23 +162,34 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
                     </div>
                 </div>
             )}
-          <textarea
-            ref={textAreaRef}
-            value={prompt}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="e.g., 'A to-do list app' or type '/' for templates"
-            className="w-full h-40 p-6 pr-20 text-xl bg-white text-gray-800 placeholder-gray-500 rounded-3xl shadow-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/60 resize-none transition-all"
-            aria-label="Initial prompt input"
-          />
-          <button
-            type="submit"
-            className="absolute bottom-4 right-6 w-12 h-12 bg-black rounded-full flex items-center justify-center transition-transform transform hover:scale-110 disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!prompt.trim()}
-            aria-label="Start building"
-          >
-            <UpArrowIcon />
-          </button>
+            <div className="relative">
+              <textarea
+                ref={textAreaRef}
+                value={prompt}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="e.g., 'A to-do list app' or type '/' for templates"
+                className="w-full h-40 p-6 pl-20 pr-20 text-xl bg-white text-gray-800 placeholder-gray-500 rounded-3xl shadow-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/60 resize-none transition-all"
+                aria-label="Initial prompt input"
+              />
+              <button
+                type="button"
+                onClick={() => setIsImageModalOpen(true)}
+                className="group absolute bottom-4 left-6 w-12 h-12 bg-gray-200/50 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+                aria-label="Generate with image"
+                title="Generate with image or icon"
+              >
+                  <ImageIcon />
+              </button>
+              <button
+                type="submit"
+                className="absolute bottom-4 right-6 w-12 h-12 bg-black rounded-full flex items-center justify-center transition-transform transform hover:scale-110 disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!prompt.trim()}
+                aria-label="Start building"
+              >
+                <UpArrowIcon />
+              </button>
+            </div>
         </form>
       </div>
     </div>

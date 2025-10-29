@@ -80,15 +80,19 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
     // --- AI Chat ---
     useEffect(() => {
         const handleInitialMessage = (event: CustomEvent) => {
-            if (project.id === event.detail.projectId && chatHistory.length === 0) {
-                handleSendMessage(event.detail.message);
+            if (project.id === event.detail.projectId && chatHistory.length === 1 && project.chatHistory.length === 1) {
+                const firstMessage = project.chatHistory[0];
+                if (firstMessage) {
+                    handleSendMessage(firstMessage.content, firstMessage.image);
+                }
             }
         };
         // @ts-ignore
         window.addEventListener('startProjectWithMessage', handleInitialMessage);
         // @ts-ignore
         return () => window.removeEventListener('startProjectWithMessage', handleInitialMessage);
-    }, [project.id]);
+    }, [project.id, project.chatHistory]);
+
 
     const getFeatureSuggestions = async (message: string) => {
         try {
@@ -121,23 +125,29 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         }
     };
 
-    const handleSendMessage = async (message: string) => {
-        if (!message.trim()) return;
+    const handleSendMessage = async (message: string, image?: string) => {
+        if (!message.trim() && !image) return;
         setIsLoading(true);
-        // FIX: Add 'as const' to prevent TypeScript from widening the string literal type of 'role' to 'string', ensuring type compatibility with ChatMessage.
-        const newHistory = [...chatHistory, { role: 'user' as const, content: message }];
+        const newUserMessage: ChatMessage = { role: 'user' as const, content: message };
+        if (image) {
+            newUserMessage.image = image;
+        }
+        const newHistory = [...chatHistory, newUserMessage];
         setChatHistory(newHistory);
 
         // Handle initial generation UI
-        if (chatHistory.length === 0) {
-            setInitialPrompt(message);
+        const isInitial = chatHistory.length === 0;
+        if (isInitial) {
+            const displayPrompt = message || 'your visual idea';
+            setInitialPrompt(displayPrompt);
             setIsGeneratingInitial(true);
-            getFeatureSuggestions(message); // Fire and forget
+            if (message) getFeatureSuggestions(message); // Fire and forget for text prompts
         }
 
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const fullPrompt = `You are an expert React developer AI. Your task is to modify a React application based on the user's request by generating a single, self-contained TSX file.
+
+            const systemInstruction = `You are an expert React developer AI. Your task is to modify a React application based on the user's request by generating a single, self-contained TSX file.
 
 **Instructions for the Response:**
 1.  **SINGLE FILE ONLY**: Your entire output MUST be a single block of TSX code for a React component. Do NOT use markdown formatting like \`\`\`tsx.
@@ -145,19 +155,25 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
 3.  **STYLING**: Use Tailwind CSS classes directly in your JSX (e.g., \`className="text-blue-500"\`). The Tailwind CDN is available automatically. You can also use inline styles for dynamic styling or include a \`<style>\` tag as a string for more complex styles.
 4.  **ROUTING**: To create multiple pages, use React state. Do not use libraries like 'react-router-dom'. Manage the current page in state and conditionally render components.
 5.  **EXTERNAL LIBRARIES**: Do NOT use any external libraries or \`import\` statements. React is available automatically.
-6.  **ENTRY POINT**: The main component must be the default export. (e.g., \`export default App;\`)
-
-**Current Code:**
----
-${code}
----
-**User request:** "${message}"
----
-**Updated self-contained TSX code:**`;
+6.  **ENTRY POINT**: The main component must be the default export. (e.g., \`export default App;\`)`;
+            
+            const userMessageParts: any[] = [];
+            if (image) {
+                const [header, data] = image.split(',');
+                const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+                userMessageParts.push({
+                    inlineData: { mimeType, data },
+                });
+            }
+            const textContent = `**User request:** "${message}"\n\n**Current Code:**\n---\n${code}\n---\n**Updated self-contained TSX code:**`;
+            userMessageParts.push({ text: textContent });
             
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
-                contents: fullPrompt
+                contents: [{ parts: userMessageParts }],
+                config: {
+                    systemInstruction: systemInstruction,
+                }
             });
 
             const responseText = response.text.trim();
