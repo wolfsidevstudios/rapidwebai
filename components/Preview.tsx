@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import type { ConsoleMessage } from './EditorPreviewPanel';
 
@@ -67,6 +68,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             "react": "https://esm.sh/react@18.2.0",
             "react-dom": "https://esm.sh/react-dom@18.2.0",
             "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
             "framer-motion": "https://esm.sh/framer-motion@11.2.12",
             "d3": "https://esm.sh/d3@7.9.0",
             "chart.js": "https://esm.sh/chart.js@4.4.3",
@@ -125,7 +127,7 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
 
                   // Transpile TSX to ES Module JavaScript
                   const transpiledCode = Babel.transform(rawCode, {
-                      presets: [['react', { runtime: 'classic' }], 'typescript'],
+                      presets: ['react', 'typescript'],
                       filename: 'App.tsx'
                   }).code;
                   
