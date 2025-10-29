@@ -57,17 +57,35 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             font-family: system-ui, sans-serif; color: #ff8080;
           }
         </style>
-        <!-- Load UMD builds for React, ReactDOM, and Babel -->
-        <script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>
-        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>
+        <!-- Babel for TSX transpilation -->
         <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+        
+        <!-- Import Map to handle bare module specifiers -->
+        <script type="importmap">
+        {
+          "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom": "https://esm.sh/react-dom@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "framer-motion": "https://esm.sh/framer-motion@11.2.12",
+            "d3": "https://esm.sh/d3@7.9.0",
+            "chart.js": "https://esm.sh/chart.js@4.4.3",
+            "react-chartjs-2": "https://esm.sh/react-chartjs-2@5.2.0",
+            "axios": "https://esm.sh/axios@1.7.2",
+            "clsx": "https://esm.sh/clsx@2.1.1",
+            "lodash": "https://esm.sh/lodash@4.17.21",
+            "date-fns": "https://esm.sh/date-fns@3.6.0",
+            "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.3"
+          }
+        }
+        <\/script>
       </head>
       <body>
         <div id="root"></div>
 
-        <script type="text/javascript">
+        <script type="module">
             // --- Console Interceptor ---
-            const originalConsole = { ...window.console };
+            const originalConsole = { ...console };
             const formatArgs = (args) => args.map(arg => {
                 if (arg instanceof Error) return arg.stack || arg.message;
                 try {
@@ -90,7 +108,8 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
                 console.error(error); // Log to parent console
                 const root = document.getElementById('root');
                 if (root) {
-                    const errorStack = error.stack ? error.stack.replace(/<anonymous>:/g, 'App.tsx:') : error.message;
+                    // Improve error message formatting
+                    const errorStack = error.stack ? error.stack.replace(/blob:https?:\/\/[^/]+\//g, '') : error.message;
                     root.innerHTML = \`<div class="error-overlay"><h3>Runtime Error</h3><pre>\${errorStack}</pre></div>\`;
                 }
             };
@@ -98,44 +117,41 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
             window.addEventListener('error', (event) => { event.preventDefault(); handleError(event.error); });
             window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); handleError(event.reason); });
             
-            // --- Legacy require-based execution logic ---
-            try {
-                // This custom, limited 'require' function is the source of the original issue.
-                const require = (path) => {
-                    if (path === 'react') return window.React;
-                    if (path === 'react-dom' || path === 'react-dom/client') return window.ReactDOM;
-                    throw new Error(\`Cannot find module '\${path}'. Complex dependencies are not supported in this previewer.\`);
-                };
+            // --- ES Module based execution logic ---
+            const renderApp = async () => {
+              try {
+                  const rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
+                  if (!rawCode.trim()) return;
 
-                const exports = {};
-                const module = { exports };
-                const rawCode = \`${escapeCodeForTemplateLiteral(code)}\`;
+                  // Transpile TSX to ES Module JavaScript
+                  const transpiledCode = Babel.transform(rawCode, {
+                      presets: ['react', 'typescript'],
+                      filename: 'App.tsx'
+                  }).code;
+                  
+                  // Create a blob URL to import the code as a module
+                  const blob = new Blob([transpiledCode], { type: 'text/javascript' });
+                  const url = URL.createObjectURL(blob);
+                  const { default: App } = await import(url);
+                  URL.revokeObjectURL(url); // Clean up
 
-                if (rawCode.trim()) {
-                    // Transpile TSX to CommonJS-style JavaScript (using 'require').
-                    const transpiledCode = Babel.transform(rawCode, {
-                        presets: ['react', 'typescript'],
-                        filename: 'App.tsx' // For better error messages
-                    }).code;
+                  // Import React and ReactDOM from the module context
+                  const React = await import('react');
+                  const ReactDOM = await import('react-dom/client');
 
-                    // Evaluate the transpiled code within a scope where 'require', 'module', and 'exports' are defined.
-                    eval(transpiledCode);
+                  if (typeof App !== 'function' && !(App && typeof App.render === 'function')) {
+                      throw new Error("The code must export a default React component.");
+                  }
+                  
+                  const root = ReactDOM.createRoot(document.getElementById('root'));
+                  root.render(React.createElement(App));
 
-                    // The main component is expected to be the default export.
-                    const App = module.exports.default;
+              } catch (err) {
+                  handleError(err);
+              }
+            };
 
-                    if (typeof App !== 'function' && !(App && typeof App.render === 'function')) {
-                        throw new Error("The code must export a default React component.");
-                    }
-
-                    // Render the final component into the 'root' div.
-                    const root = ReactDOM.createRoot(document.getElementById('root'));
-                    root.render(React.createElement(App));
-                }
-
-            } catch (err) {
-                handleError(err);
-            }
+            renderApp();
         <\/script>
       </body>
     </html>
