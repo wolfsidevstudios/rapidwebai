@@ -123,28 +123,21 @@ const App: React.FC = () => {
         }
         return;
     }
-    const defaultCode = `import React from 'react';
-
-function App() {
-  const containerStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100vh',
-    textAlign: 'center',
-    fontFamily: 'sans-serif',
-  };
-  
-  return (
-    <div style={containerStyle}>
-      <h1>Generating your app...</h1>
-      <p>The AI is creating your new project. This might take a moment.</p>
+    const defaultCode = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generating App...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white">
+    <div class="flex flex-col items-center justify-center h-screen text-center font-sans">
+        <h1 class="text-4xl font-bold text-gray-800">Generating your app...</h1>
+        <p class="mt-4 text-lg text-gray-600">The AI is creating your new project. This might take a moment.</p>
     </div>
-  );
-}
-
-export default App;
+</body>
+</html>
 `;
     const initialChatHistory: ChatMessage[] = [];
     if (prompt || image) {

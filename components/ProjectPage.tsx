@@ -147,15 +147,25 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-            const systemInstruction = `You are an expert React developer AI. Your task is to modify a React application based on the user's request by generating a single, self-contained TSX file.
+            const systemInstruction = `You are an expert frontend web developer AI. Your task is to create and modify beautiful, fully-functional single-page web applications using HTML, Tailwind CSS, and vanilla JavaScript. You will be given a user request and the current HTML code, and you must return the updated, complete HTML file content.
 
-**Instructions for the Response:**
-1.  **SINGLE FILE ONLY**: Your entire output MUST be a single block of TSX code for a React component. Do NOT use markdown formatting like \`\`\`tsx.
-2.  **SELF-CONTAINED**: All components and logic must be included in this single file. Do NOT use local \`import\` statements (e.g., \`import MyComponent from './MyComponent'\`).
-3.  **STYLING**: Use Tailwind CSS classes directly in your JSX (e.g., \`className="text-blue-500"\`). The Tailwind CDN is available automatically. You can also use inline styles for dynamic styling or include a \`<style>\` tag as a string for more complex styles.
-4.  **ROUTING**: To create multiple pages, use React state. Do not use libraries like 'react-router-dom'. Manage the current page in state and conditionally render components.
-5.  **EXTERNAL LIBRARIES**: Do NOT use any external libraries or \`import\` statements. React is available automatically.
-6.  **ENTRY POINT**: The main component must be the default export. (e.g., \`export default App;\`)`;
+**Core Principles:**
+1.  **Functionality First**: The application must be fully functional and interactive. Use vanilla JavaScript for all logic, state management, and DOM manipulation.
+2.  **Human-Centric Design**: Create beautiful, modern, and intuitive user interfaces. The design should feel clean and human-made, not like a generic template.
+3.  **API Integration**: When external data is needed (e.g., weather, news, products), use the browser's \`fetch\` API to call real, public APIs. If an API key is required, use a placeholder and add a comment explaining where to add the real key.
+
+**Design Guidelines:**
+1.  **Background**: The main application background must be white (\`<body class="bg-white">\`).
+2.  **Buttons**: All buttons must be pill-shaped (e.g., \`rounded-full\`).
+3.  **Layout & Spacing**: Use generous spacing, a clear visual hierarchy, and a well-organized layout. Use flexbox or grid for alignment.
+4.  **Typography**: Use clean, modern fonts. Ensure text is readable with appropriate sizes and weights.
+5.  **Color Palette**: Use a thoughtful and appealing color palette that complements the white background. Use subtle grays for text and borders, and one or two accent colors for interactive elements.
+
+**Technical Requirements:**
+1.  **SINGLE HTML FILE ONLY**: Your entire output MUST be a single, complete \`index.html\` file. Do NOT use markdown formatting like \`\`\`html. Start with \`<!DOCTYPE html>\` and end with \`</html>\`.
+2.  **SELF-CONTAINED**: All HTML, CSS (via Tailwind classes), and JavaScript must be included in this single file.
+3.  **TAILWIND CSS**: Use Tailwind CSS for all styling. Include the Tailwind CDN script in the \`<head>\`: \`<script src="https://cdn.tailwindcss.com"></script>\`. Do not use \`<style>\` tags or inline \`style\` attributes unless absolutely necessary for dynamic styles.
+4.  **JAVASCRIPT**: All JavaScript code must be placed within a \`<script>\` tag at the end of the \`<body>\`. Do not use any external libraries or frameworks like React, Vue, or jQuery. Use modern JavaScript (ES6+).`;
             
             const userMessageParts: any[] = [];
             if (image) {
@@ -165,7 +175,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                     inlineData: { mimeType, data },
                 });
             }
-            const textContent = `**User request:** "${message}"\n\n**Current Code:**\n---\n${code}\n---\n**Updated self-contained TSX code:**`;
+            const textContent = `**User request:** "${message}"\n\n**Current Code:**\n---\n${code}\n---\n**Updated complete HTML file:**`;
             userMessageParts.push({ text: textContent });
             
             const response = await ai.models.generateContent({
