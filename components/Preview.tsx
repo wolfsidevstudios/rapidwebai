@@ -207,7 +207,10 @@ const Preview: React.FC<PreviewProps> = ({ code, onConsoleMessage, clearConsole 
 
                 // 3. Transpile TSX to ES Module JavaScript using Babel.
                 const transpiledCode = Babel.transform(rawCode, {
-                  presets: [['react', { runtime: 'classic' }], 'typescript'],
+                  presets: [
+                    ['react', { runtime: 'classic' }], 
+                    ['typescript', { isTSX: true, allExtensions: true }]
+                  ],
                   filename: 'App.tsx' // For better error messages
                 }).code;
                 
