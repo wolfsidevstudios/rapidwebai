@@ -11,9 +11,11 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
     const handleConsoleMessage = () => {}; 
     const clearConsole = () => {};
 
+    const codeToPreview = project.files['pages/index.tsx'] || '<div>Project main page not found.</div>';
+
     return (
         <div className="h-screen w-screen bg-white">
-            <Preview code={project.code} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
+            <Preview code={codeToPreview} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
         </div>
     );
 };

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import CodeEditor from './CodeEditor';
 import Preview from './Preview';
 import GeneratingPreview, { Suggestion } from './GeneratingPreview';
+import FileExplorer from './FileExplorer';
 
 export interface ConsoleMessage {
     type: 'log' | 'warn' | 'error' | 'info' | 'debug';
@@ -10,8 +11,8 @@ export interface ConsoleMessage {
 }
 
 interface EditorPreviewPanelProps {
-  code: string;
-  onCodeChange: (value: string) => void;
+  files: { [key: string]: string };
+  onFilesChange: (files: { [key: string]: string }) => void;
   isGeneratingInitial: boolean;
   suggestions: Suggestion[];
   onAddToChat: (prompt: string) => void;
@@ -43,8 +44,9 @@ const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => 
     );
 };
 
-const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeChange, isGeneratingInitial, suggestions, onAddToChat, initialPrompt }) => {
+const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesChange, isGeneratingInitial, suggestions, onAddToChat, initialPrompt }) => {
   const [activeView, setActiveView] = useState<'preview' | 'code' | 'console'>('preview');
+  const [activeFile, setActiveFile] = useState('pages/index.tsx');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
 
   const handleConsoleMessage = useCallback((message: ConsoleMessage) => {
@@ -52,12 +54,26 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeCha
   }, []);
   
   const clearConsole = useCallback(() => setConsoleMessages([]), []);
+  
+  const handleCodeChange = (newCode: string) => {
+    onFilesChange({ ...files, [activeFile]: newCode });
+  };
+  
+  // Ensure activeFile always exists in files
+  if (!files[activeFile]) {
+      const firstFile = Object.keys(files)[0] || 'pages/index.tsx';
+      if(activeFile !== firstFile) {
+        setActiveFile(firstFile);
+      }
+  }
 
   const renderPreview = () => {
     if (isGeneratingInitial) {
       return <GeneratingPreview suggestions={suggestions} onAddToChat={onAddToChat} initialPrompt={initialPrompt} />;
     }
-    return <Preview code={code} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
+    // Only attempt to render .tsx files. For others, show a message.
+    const codeToPreview = (activeFile.endsWith('.tsx') || activeFile.endsWith('.jsx')) ? files[activeFile] : `// Cannot preview this file type`;
+    return <Preview code={codeToPreview || ''} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
   };
 
   return (
@@ -82,7 +98,21 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ code, onCodeCha
         
       <div className="flex-grow h-full w-full overflow-hidden">
         {activeView === 'code' && (
-          <CodeEditor value={code} onChange={onCodeChange} />
+          <div className="flex h-full w-full">
+            <div className="w-1/3 max-w-xs h-full bg-[#181818] border-r border-white/10">
+              <FileExplorer
+                files={Object.keys(files)}
+                activeFile={activeFile}
+                onSelectFile={setActiveFile}
+              />
+            </div>
+            <div className="flex-grow h-full">
+              <CodeEditor
+                value={files[activeFile] || ''}
+                onChange={handleCodeChange}
+              />
+            </div>
+          </div>
         )}
         {activeView === 'preview' && (
             <div className="h-full w-full bg-white">

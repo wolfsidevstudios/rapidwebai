@@ -1,8 +1,8 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './ChatPanel';
 import EditorPreviewPanel from './EditorPreviewPanel';
-// FIX: Import ChatMessage type to correctly type the chatHistory state.
 import type { Project, ChatMessage } from '../App';
 import { GoogleGenAI, Type } from "@google/genai";
 import PublishModal from './PublishModal';
@@ -21,25 +21,50 @@ const CheckIcon: React.FC = () => (
     </svg>
 );
 
+const codeGenerationPrompt = (currentFiles: object, message: string, selectedApis: string[]) => `You are an expert web developer specializing in Next.js, Tailwind CSS, and TypeScript.
+Your task is to modify a set of project files based on a user's request.
+The user wants to build a web application.
+
+Current project files:
+${JSON.stringify(currentFiles, null, 2)}
+
+User's request: "${message}"
+
+${selectedApis.length > 0 ? `The user has enabled the following APIs: ${selectedApis.join(', ')}. You can use them if needed.` : ''}
+
+Analyze the user's request and the current file structure.
+Generate a complete and updated set of files to fulfill the request.
+The main page to display is 'pages/index.tsx'. Ensure it is fully functional and styled.
+The generated code must be fully functional. For interactive applications (like a to-do list, forms, etc.), ensure all client-side logic is implemented correctly (e.g., state management with React hooks for adding, deleting, and updating data) so the application is interactive and usable.
+Do not truncate code or use placeholders like \`// ...\`. Provide the complete, runnable code for each file.
+If you need to add dependencies, update package.json.
+Your response MUST be a JSON object with file paths as keys and their full content as string values.
+Do not omit any files, even if they are unchanged. Return the complete project structure.
+Example response format:
+{
+  "pages/index.tsx": "...",
+  "styles/globals.css": "...",
+  "package.json": "..."
+}
+`;
+
+
 interface ProjectPageProps {
     project: Project;
     onUpdateProject: (updatedProject: Project) => void;
 }
 
 const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) => {
-    const [code, setCode] = useState(project.code);
-    // FIX: Explicitly type the chatHistory state to prevent type inference issues with the 'role' property.
+    const [files, setFiles] = useState(project.files);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>(project.chatHistory);
     const [isLoading, setIsLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [selectedApis, setSelectedApis] = useState<string[]>([]);
     
-    // State for the new generating UI
     const [isGeneratingInitial, setIsGeneratingInitial] = useState(false);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [initialPrompt, setInitialPrompt] = useState('');
 
-    // Centralized chat input state
     const [chatInput, setChatInput] = useState('');
     
     const [isEditingName, setIsEditingName] = useState(false);
@@ -53,198 +78,268 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
             isInitialMount.current = false;
             return;
         }
-        onUpdateProject({ ...project, code, chatHistory, name: projectName });
-    }, [code, chatHistory, projectName]);
-    
-    // --- Project Name Edit ---
-    useEffect(() => { setProjectName(project.name); }, [project.name]);
-    useEffect(() => { if (isEditingName) inputRef.current?.focus(); }, [isEditingName]);
+        onUpdateProject({ ...project, files, chatHistory, name: projectName });
+    }, [files, chatHistory, projectName, onUpdateProject, project]);
+
+    useEffect(() => {
+        setFiles(project.files);
+        setChatHistory(project.chatHistory);
+        setProjectName(project.name);
+    }, [project]);
+
+     useEffect(() => {
+        if (isEditingName) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditingName]);
 
     const handleNameUpdate = () => {
         if (projectName.trim()) {
-            onUpdateProject({ ...project, name: projectName.trim() });
+            setIsEditingName(false);
         } else {
-            setProjectName(project.name);
+            setProjectName(project.name); // Revert if empty
         }
         setIsEditingName(false);
     };
 
     const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') handleNameUpdate();
-        else if (e.key === 'Escape') {
+        if (e.key === 'Enter') {
+            handleNameUpdate();
+        } else if (e.key === 'Escape') {
             setProjectName(project.name);
             setIsEditingName(false);
         }
     };
     
-    // --- AI Chat ---
-    useEffect(() => {
-        const handleInitialMessage = (event: CustomEvent) => {
-            if (project.id === event.detail.projectId && chatHistory.length === 1 && project.chatHistory.length === 1) {
-                const firstMessage = project.chatHistory[0];
-                if (firstMessage) {
-                    handleSendMessage(firstMessage.content, firstMessage.image);
-                }
-            }
-        };
-        // @ts-ignore
-        window.addEventListener('startProjectWithMessage', handleInitialMessage);
-        // @ts-ignore
-        return () => window.removeEventListener('startProjectWithMessage', handleInitialMessage);
-    }, [project.id, project.chatHistory]);
-
-
-    const getFeatureSuggestions = async (message: string) => {
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: `Based on the following app idea, suggest 3 creative features. For each feature, provide a short title (max 5 words), a one-sentence description, and a concise prompt that a user could give to an AI developer to implement it. App Idea: "${message}"`,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                title: { type: Type.STRING },
-                                description: { type: Type.STRING },
-                                prompt: { type: Type.STRING },
-                            },
-                            required: ["title", "description", "prompt"],
-                        },
-                    },
-                },
-            });
-            const suggestedFeatures = JSON.parse(response.text);
-            setSuggestions(suggestedFeatures);
-        } catch (error) {
-            console.error("Failed to fetch feature suggestions:", error);
-            // Don't show an error to the user, just fail gracefully
-            setSuggestions([]); 
-        }
-    };
-
-    const handleSendMessage = async (message: string, image?: string) => {
-        if (!message.trim() && !image) return;
+    const callGemini = async (message: string, image?: string) => {
         setIsLoading(true);
-        const newUserMessage: ChatMessage = { role: 'user' as const, content: message };
-        if (image) {
-            newUserMessage.image = image;
-        }
-        const newHistory = [...chatHistory, newUserMessage];
+        const newHistory: ChatMessage[] = [...chatHistory, { role: 'user', content: message, image }];
         setChatHistory(newHistory);
 
-        // Handle initial generation UI
-        const isInitial = chatHistory.length === 0;
-        if (isInitial) {
-            const displayPrompt = message || 'your visual idea';
-            setInitialPrompt(displayPrompt);
-            setIsGeneratingInitial(true);
-            if (message) getFeatureSuggestions(message); // Fire and forget for text prompts
-        }
-
         try {
+            // FIX: The GoogleGenAI class is imported and should not be accessed from the window object.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const model = 'gemini-2.5-pro';
+            const currentFiles = files;
 
-            const systemInstruction = `You are an expert frontend web developer AI. Your task is to create and modify beautiful, fully-functional single-page web applications using HTML, Tailwind CSS, and vanilla JavaScript. You will be given a user request and the current HTML code, and you must return the updated, complete HTML file content.
+            const fullPrompt = codeGenerationPrompt(currentFiles, message, selectedApis);
 
-**Core Principles:**
-1.  **Functionality First**: The application must be fully functional and interactive. Use vanilla JavaScript for all logic, state management, and DOM manipulation.
-2.  **Human-Centric Design**: Create beautiful, modern, and intuitive user interfaces. The design should feel clean and human-made, not like a generic template.
-3.  **API Integration**: When external data is needed (e.g., weather, news, products), use the browser's \`fetch\` API to call real, public APIs. If an API key is required, use a placeholder and add a comment explaining where to add the real key.
-
-**Design Guidelines:**
-1.  **Background**: The main application background must be white (\`<body class="bg-white">\`).
-2.  **Buttons**: All buttons must be pill-shaped (e.g., \`rounded-full\`).
-3.  **Layout & Spacing**: Use generous spacing, a clear visual hierarchy, and a well-organized layout. Use flexbox or grid for alignment.
-4.  **Typography**: Use clean, modern fonts. Ensure text is readable with appropriate sizes and weights.
-5.  **Color Palette**: Use a thoughtful and appealing color palette that complements the white background. Use subtle grays for text and borders, and one or two accent colors for interactive elements.
-
-**Technical Requirements:**
-1.  **SINGLE HTML FILE ONLY**: Your entire output MUST be a single, complete \`index.html\` file. Do NOT use markdown formatting like \`\`\`html. Start with \`<!DOCTYPE html>\` and end with \`</html>\`.
-2.  **SELF-CONTAINED**: All HTML, CSS (via Tailwind classes), and JavaScript must be included in this single file.
-3.  **TAILWIND CSS**: Use Tailwind CSS for all styling. Include the Tailwind CDN script in the \`<head>\`: \`<script src="https://cdn.tailwindcss.com"></script>\`. Do not use \`<style>\` tags or inline \`style\` attributes unless absolutely necessary for dynamic styles.
-4.  **JAVASCRIPT**: All JavaScript code must be placed within a \`<script>\` tag at the end of the \`<body>\`. Do not use any external libraries or frameworks like React, Vue, or jQuery. Use modern JavaScript (ES6+).`;
-            
-            const userMessageParts: any[] = [];
+            const parts: any[] = [{ text: fullPrompt }];
             if (image) {
-                const [header, data] = image.split(',');
-                const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-                userMessageParts.push({
-                    inlineData: { mimeType, data },
+                const mimeType = image.split(';')[0].split(':')[1];
+                const base64Data = image.split(',')[1];
+                parts.push({
+                    inlineData: {
+                        mimeType,
+                        data: base64Data,
+                    },
                 });
             }
-            const textContent = `**User request:** "${message}"\n\n**Current Code:**\n---\n${code}\n---\n**Updated complete HTML file:**`;
-            userMessageParts.push({ text: textContent });
-            
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-pro',
-                contents: [{ parts: userMessageParts }],
-                config: {
-                    systemInstruction: systemInstruction,
-                }
-            });
 
-            const responseText = response.text.trim();
-            setCode(responseText);
-            setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the application. Check out the new preview!" }]);
+            const config: any = {
+                responseMimeType: "application/json",
+                // FIX: `additionalProperties` should be inside `responseSchema` for correct JSON schema validation.
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        "pages/index.tsx": { type: Type.STRING },
+                        "styles/globals.css": { type: Type.STRING },
+                        "package.json": { type: Type.STRING },
+                        "tailwind.config.js": { type: Type.STRING },
+                    },
+                    required: ["pages/index.tsx", "styles/globals.css", "package.json", "tailwind.config.js"],
+                    // Allow additional properties for any other files created
+                    additionalProperties: { type: Type.STRING }
+                },
+            };
+
+            const response = await ai.models.generateContent({
+                model: model,
+                contents: { parts: parts },
+                config: config,
+            });
             
-        } catch (err: unknown) {
-            console.error(err);
-            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            const responseText = response.text;
+            const updatedFiles = JSON.parse(responseText);
+            setFiles(updatedFiles);
+            setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the files based on your request." }]);
+        } catch (error) {
+            console.error("Error calling Gemini API:", error);
+            const errorMessage = (error as Error).message || "An unknown error occurred.";
             setChatHistory(prev => [...prev, { role: 'model', content: `Sorry, I ran into an error: ${errorMessage}` }]);
         } finally {
             setIsLoading(false);
-            setIsGeneratingInitial(false); // End the special generating UI state
         }
     };
 
-    return (
-        <div className="h-full w-full bg-black font-sans flex flex-col">
-            <header className="shrink-0 z-40 bg-black/30 backdrop-blur-lg border-b border-white/10 text-white">
-                <div className="flex justify-between items-center p-4 h-16">
-                    <div className="flex items-center group">
-                        {isEditingName ? (
-                            <div className="flex items-center space-x-2">
-                                <input ref={inputRef} type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} onKeyDown={handleInputKeyDown} onBlur={handleNameUpdate} className="bg-white/10 text-white placeholder-white/50 border border-white/20 rounded-md px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                                <button onClick={handleNameUpdate} className="p-1.5 bg-blue-600 rounded-md hover:bg-blue-500 transition-colors"><CheckIcon /></button>
-                            </div>
-                        ) : (
-                            <div onClick={() => setIsEditingName(true)} className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-white/10 transition-colors">
-                                <h1 className="text-lg font-medium text-white/90">{projectName}</h1>
-                                <span className="opacity-0 group-hover:opacity-60 transition-opacity"><EditIcon /></span>
-                            </div>
-                        )}
-                    </div>
-                    <button onClick={() => setIsPublishing(true)} className="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white text-black hover:bg-gray-200">Publish</button>
-                </div>
-            </header>
+    const onSendMessage = callGemini;
+    
+    useEffect(() => {
+        const handleStart = async (event: Event) => {
+            const { projectId } = (event as CustomEvent).detail;
+            if (projectId !== project.id) return;
+
+            const userMessage = project.chatHistory.find(m => m.role === 'user');
+            if (!userMessage) return;
+
+            setIsGeneratingInitial(true);
+            setInitialPrompt(userMessage.content);
             
-            <main className="flex flex-grow text-white min-h-0">
-                <div className="w-2/5 h-full border-r border-white/10">
-                    <ChatPanel 
-                        chatHistory={chatHistory} 
-                        onSendMessage={handleSendMessage} 
-                        isLoading={isLoading} 
-                        selectedApis={selectedApis} 
-                        onSelectedApisChange={setSelectedApis}
-                        chatInput={chatInput}
-                        onChatInputChange={setChatInput}
-                    />
-                </div>
-                <div className="w-3/5 h-full">
-                    <EditorPreviewPanel
-                        code={code}
-                        onCodeChange={setCode}
-                        isGeneratingInitial={isGeneratingInitial}
-                        suggestions={suggestions}
-                        onAddToChat={setChatInput}
-                        initialPrompt={initialPrompt}
-                    />
-                </div>
-            </main>
+            try {
+                // FIX: The GoogleGenAI class is imported and should not be accessed from the window object.
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const model = 'gemini-2.5-pro';
+                const currentFiles = project.files;
+
+                const fullPrompt = codeGenerationPrompt(currentFiles, userMessage.content, []);
+                
+                const parts: any[] = [{ text: fullPrompt }];
+                if (userMessage.image) {
+                    const mimeType = userMessage.image.split(';')[0].split(':')[1];
+                    const base64Data = userMessage.image.split(',')[1];
+                    parts.push({
+                        inlineData: {
+                            mimeType,
+                            data: base64Data,
+                        },
+                    });
+                }
+
+                const config: any = {
+                    responseMimeType: "application/json",
+                    // FIX: `additionalProperties` should be inside `responseSchema` for correct JSON schema validation.
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            "pages/index.tsx": { type: Type.STRING },
+                            "styles/globals.css": { type: Type.STRING },
+                            "package.json": { type: Type.STRING },
+                            "tailwind.config.js": { type: Type.STRING },
+                        },
+                        required: ["pages/index.tsx", "styles/globals.css", "package.json", "tailwind.config.js"],
+                        additionalProperties: { type: Type.STRING }
+                    },
+                };
+
+                const [fileGenResponse, suggestionResponse] = await Promise.all([
+                    ai.models.generateContent({
+                        model: model,
+                        contents: { parts: parts },
+                        config: config,
+                    }),
+                    ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: `Based on the user's request to build "${userMessage.content}", generate 3-5 creative and useful follow-up suggestions for features to add next. Return a JSON object with a single key "suggestions", which is an array of objects. Each object should have "title", "description", and "prompt" keys. "prompt" should be a concise instruction for the AI to implement that feature.`,
+                        config: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    suggestions: {
+                                        type: Type.ARRAY,
+                                        items: {
+                                            type: Type.OBJECT,
+                                            properties: {
+                                                title: { type: Type.STRING },
+                                                description: { type: Type.STRING },
+                                                prompt: { type: Type.STRING },
+                                            },
+                                            required: ["title", "description", "prompt"]
+                                        }
+                                    }
+                                },
+                                required: ["suggestions"]
+                            }
+                        }
+                    })
+                ]);
+                
+                const responseText = fileGenResponse.text;
+                const updatedFiles = JSON.parse(responseText);
+                setFiles(updatedFiles);
+
+                const suggestionsText = suggestionResponse.text;
+                const parsedSuggestions = JSON.parse(suggestionsText);
+                setSuggestions(parsedSuggestions.suggestions || []);
+
+                setChatHistory(prev => [...prev, { role: 'model', content: "I've created the initial files for your project." }]);
+            } catch (error) {
+                console.error("Error calling Gemini API for initial generation:", error);
+                const errorMessage = (error as Error).message || "An unknown error occurred.";
+                setChatHistory(prev => [...prev, { role: 'model', content: `Sorry, I ran into an error during initial setup: ${errorMessage}` }]);
+            } finally {
+                setIsGeneratingInitial(false);
+            }
+        };
+
+        window.addEventListener('startProjectWithMessage', handleStart);
+        return () => window.removeEventListener('startProjectWithMessage', handleStart);
+    }, [project.id, project.files, project.chatHistory]);
+
+    const handleAddToChat = useCallback((prompt: string) => {
+        setChatInput(prompt);
+    }, []);
+
+    return (
+        <div className="h-full w-full flex bg-black relative">
+            <div className="w-[450px] h-full border-r border-white/10 flex-shrink-0">
+                <ChatPanel
+                    chatHistory={chatHistory}
+                    onSendMessage={onSendMessage}
+                    isLoading={isLoading}
+                    selectedApis={selectedApis}
+                    onSelectedApisChange={setSelectedApis}
+                    chatInput={chatInput}
+                    onChatInputChange={setChatInput}
+                />
+            </div>
+            <div className="flex-grow h-full">
+                <EditorPreviewPanel
+                    files={files}
+                    onFilesChange={setFiles}
+                    isGeneratingInitial={isGeneratingInitial}
+                    suggestions={suggestions}
+                    onAddToChat={handleAddToChat}
+                    initialPrompt={initialPrompt}
+                />
+            </div>
             {isPublishing && <PublishModal projectId={project.id} onClose={() => setIsPublishing(false)} />}
+             <div className="absolute top-4 right-4 z-10">
+                <button
+                    onClick={() => setIsPublishing(true)}
+                    className="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white text-black hover:bg-gray-200"
+                >
+                    Publish
+                </button>
+            </div>
+             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                <div className="flex items-center group">
+                    {isEditingName ? (
+                        <div className="flex items-center space-x-2">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={projectName}
+                                onChange={(e) => setProjectName(e.target.value)}
+                                onKeyDown={handleInputKeyDown}
+                                onBlur={handleNameUpdate}
+                                className="bg-white/10 text-white placeholder-white/50 border border-white/20 rounded-md px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button onClick={handleNameUpdate} className="p-1.5 bg-blue-600 rounded-md hover:bg-blue-500 transition-colors">
+                                <CheckIcon />
+                            </button>
+                        </div>
+                    ) : (
+                        <div onClick={() => setIsEditingName(true)} className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-white/10 transition-colors">
+                            <h1 className="text-lg font-medium text-white/90">{projectName}</h1>
+                            <span className="opacity-0 group-hover:opacity-60 transition-opacity">
+                                <EditIcon />
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

@@ -25,7 +25,7 @@ export interface UserProfile {
 export interface Project {
   id: string;
   name:string;
-  code: string; // Changed from 'files'
+  files: { [key: string]: string };
   chatHistory: ChatMessage[];
   createdAt: number;
 }
@@ -123,22 +123,66 @@ const App: React.FC = () => {
         }
         return;
     }
-    const defaultCode = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generating App...</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-white">
-    <div class="flex flex-col items-center justify-center h-screen text-center font-sans">
-        <h1 class="text-4xl font-bold text-gray-800">Generating your app...</h1>
-        <p class="mt-4 text-lg text-gray-600">The AI is creating your new project. This might take a moment.</p>
+    const defaultFiles = {
+      'pages/index.tsx': `import React from 'react';
+
+const HomePage = () => {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-white font-sans">
+        <div className="text-center">
+            <h1 className="text-4xl font-bold text-gray-800">Generating your app...</h1>
+            <p className="mt-4 text-lg text-gray-600">The AI is creating your new project. This might take a moment.</p>
+        </div>
     </div>
-</body>
-</html>
-`;
+  );
+};
+
+export default HomePage;
+`,
+      'styles/globals.css': `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`,
+      'package.json': JSON.stringify({
+        name: 'new-nextjs-app',
+        version: '0.1.0',
+        private: true,
+        scripts: {
+          dev: 'next dev',
+          build: 'next build',
+          start: 'next start',
+          lint: 'next lint',
+        },
+        dependencies: {
+          react: '^18',
+          'react-dom': '^18',
+          next: '14.2.3',
+        },
+        devDependencies: {
+          typescript: '^5',
+          '@types/node': '^20',
+          '@types/react': '^18',
+          '@types/react-dom': '^18',
+          postcss: '^8',
+          tailwindcss: '^3.4.1',
+          eslint: '^8',
+          'eslint-config-next': '14.2.3',
+        },
+      }, null, 2),
+      'tailwind.config.js': `/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+`
+    };
+
     const initialChatHistory: ChatMessage[] = [];
     if (prompt || image) {
         initialChatHistory.push({
@@ -151,14 +195,13 @@ const App: React.FC = () => {
     const newProject: Project = {
         id: `proj-${Date.now()}`,
         name: prompt.substring(0, 50) || 'New Visual Project',
-        code: defaultCode,
+        files: defaultFiles,
         chatHistory: initialChatHistory,
         createdAt: Date.now(),
     };
     setProjects(prev => [...prev, newProject]);
     setPendingNavigationProjectId(newProject.id);
     
-    // The message is now pre-loaded in chat history, so we just need to trigger the AI processing
     if (initialChatHistory.length > 0) {
         setTimeout(() => {
             window.dispatchEvent(new CustomEvent('startProjectWithMessage', { detail: { projectId: newProject.id } }));
