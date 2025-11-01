@@ -19,45 +19,32 @@ const CheckIcon: React.FC = () => (
     </svg>
 );
 
-const codeGenerationPrompt = (currentFiles: object, message: string, selectedApis: string[]) => `You are an expert web developer specializing in vanilla HTML, CSS, and JavaScript.
-Your task is to create or modify a set of project files for a standalone web application based on a user's request.
-The app should not use any frameworks like React, Vue, or Angular. It must be self-contained in 'index.html', 'style.css', and 'script.js'.
+const codeGenerationPrompt = (currentCode: string, message: string, selectedApis: string[]) => `You are an expert React Native developer.
+Your task is to create or modify a single 'App.js' file for a React Native application that can run in Expo Snack.
+The app must be self-contained in this single file. Use functional components and hooks.
 
-**PWA & OFFLINE SUPPORT:**
-This is a Progressive Web App (PWA) project. The goal is to make the application fully offline-capable.
-- You must provide a 'manifest.json' file. Modify the 'name', 'short_name', and 'description' fields to be relevant to the user's request.
-- You must provide a service worker file, 'sw.js', that caches the core application files ('index.html', 'style.css', 'script.js').
-- The 'index.html' file should correctly link to the manifest and register the 'sw.js' service worker.
+**CORE REQUIREMENTS:**
+1.  **Single File:** All code, including components and styles, must be in the 'App.js' file.
+2.  **Expo Compatible:** Use components from 'react-native'. You can also import from 'expo-constants', 'expo-status-bar', or '@expo/vector-icons'. Do not use libraries that require custom native code or complex setup not available in Expo Snack.
+3.  **Functional:** The generated code must be fully functional and runnable. For interactive elements, ensure all necessary logic (state, event handlers) is included.
+4.  **Styling:** Use \`StyleSheet.create\` for all styles. Place the stylesheet at the bottom of the file.
 
-**CORE REQUIREMENT: FULL FUNCTIONALITY**
-The generated code must be fully functional. This is critical.
-For interactive applications (like a to-do list, forms, calculators, etc.), the 'script.js' file must contain all the necessary client-side logic.
-This includes:
-- Selecting DOM elements.
-- Adding event listeners (e.g., for button clicks, form submissions).
-- Manipulating the DOM to add, remove, or update content dynamically.
-- Managing application state (e.g., in an array for a to-do list).
-The application must be interactive and usable as described in the user's request.
-
-Current project files:
-${JSON.stringify(currentFiles, null, 2)}
+Current 'App.js' code:
+\`\`\`javascript
+${currentCode}
+\`\`\`
 
 User's request: "${message}"
 
-${selectedApis.length > 0 ? `The user has enabled the following APIs: ${selectedApis.join(', ')}. You can use them if needed. Ensure that data fetched from these APIs is cached for offline use.` : ''}
+${selectedApis.length > 0 ? `The user has enabled the following APIs: ${selectedApis.join(', ')}. You can use them if needed. Use the 'fetch' API for network requests.` : ''}
 
-Analyze the user's request and the current file structure.
-Generate a complete and updated set of files to fulfill the request.
-Do not truncate code or use placeholders like \`// ...\`. Provide the complete, runnable code for each file.
-Your response MUST be a JSON object with file paths as keys and their full content as string values.
-You must return all project files ('index.html', 'style.css', 'script.js', 'manifest.json', 'sw.js'), even if they are unchanged.
+Analyze the user's request and the current code.
+Generate the complete, updated content for the 'App.js' file.
+Do not truncate code or use placeholders like \`// ...\`. Provide the complete, runnable code.
+Your response MUST be a JSON object with a single key "App.js" and its full content as a string value.
 Example response format:
 {
-  "index.html": "<!DOCTYPE html>...",
-  "style.css": "body { ... }",
-  "script.js": "document.addEventListener...",
-  "manifest.json": "{ ... }",
-  "sw.js": "self.addEventListener..."
+  "App.js": "import React from 'react';\\nimport { Text, View, StyleSheet } from 'react-native';\\n..."
 }
 `;
 
@@ -133,9 +120,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const model = 'gemini-2.5-pro';
-            const currentFiles = files;
+            const currentCode = files['App.js'];
 
-            const fullPrompt = codeGenerationPrompt(currentFiles, message, selectedApis);
+            const fullPrompt = codeGenerationPrompt(currentCode, message, selectedApis);
 
             const parts: any[] = [{ text: fullPrompt }];
             if (image) {
@@ -154,20 +141,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        "index.html": { type: Type.STRING },
-                        "style.css": { type: Type.STRING },
-                        "script.js": { type: Type.STRING },
-                        "manifest.json": { type: Type.STRING },
-                        "sw.js": { type: Type.STRING },
+                        "App.js": { type: Type.STRING },
                     },
-                    required: [
-                        "index.html", 
-                        "style.css", 
-                        "script.js",
-                        "manifest.json",
-                        "sw.js"
-                    ],
-                    additionalProperties: { type: Type.STRING }
+                    required: ["App.js"],
                 },
             };
 
@@ -180,7 +156,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
             const responseText = response.text;
             const updatedFiles = JSON.parse(responseText);
             setFiles(updatedFiles);
-            setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the files based on your request." }]);
+            setChatHistory(prev => [...prev, { role: 'model', content: "I've updated the app based on your request." }]);
         } catch (error) {
             console.error("Error calling Gemini API:", error);
             const errorMessage = (error as Error).message || "An unknown error occurred.";
@@ -206,9 +182,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
             try {
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 const model = 'gemini-2.5-pro';
-                const currentFiles = project.files;
+                const currentCode = project.files['App.js'];
 
-                const fullPrompt = codeGenerationPrompt(currentFiles, userMessage.content, []);
+                const fullPrompt = codeGenerationPrompt(currentCode, userMessage.content, []);
                 
                 const parts: any[] = [{ text: fullPrompt }];
                 if (userMessage.image) {
@@ -227,20 +203,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                     responseSchema: {
                         type: Type.OBJECT,
                         properties: {
-                            "index.html": { type: Type.STRING },
-                            "style.css": { type: Type.STRING },
-                            "script.js": { type: Type.STRING },
-                            "manifest.json": { type: Type.STRING },
-                            "sw.js": { type: Type.STRING },
+                            "App.js": { type: Type.STRING },
                         },
-                        required: [
-                            "index.html", 
-                            "style.css", 
-                            "script.js",
-                            "manifest.json",
-                            "sw.js"
-                        ],
-                        additionalProperties: { type: Type.STRING }
+                        required: ["App.js"],
                     },
                 };
 
@@ -252,7 +217,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ project, onUpdateProject }) =
                     }),
                     ai.models.generateContent({
                         model: 'gemini-2.5-flash',
-                        contents: `Based on the user's request to build "${userMessage.content}", generate 3-5 creative and useful follow-up suggestions for features to add next. Return a JSON object with a single key "suggestions", which is an array of objects. Each object should have "title", "description", and "prompt" keys. "prompt" should be a concise instruction for the AI to implement that feature.`,
+                        contents: `Based on the user's request to build a React Native app: "${userMessage.content}", generate 3-5 creative and useful follow-up suggestions for features to add next. Return a JSON object with a single key "suggestions", which is an array of objects. Each object should have "title", "description", and "prompt" keys. "prompt" should be a concise instruction for the AI to implement that feature.`,
                         config: {
                             responseMimeType: "application/json",
                             responseSchema: {

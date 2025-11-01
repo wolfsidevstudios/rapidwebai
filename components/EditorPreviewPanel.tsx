@@ -4,12 +4,6 @@ import Preview from './Preview';
 import GeneratingPreview, { Suggestion } from './GeneratingPreview';
 import FileExplorer from './FileExplorer';
 
-export interface ConsoleMessage {
-    type: 'log' | 'warn' | 'error' | 'info' | 'debug';
-    message: string;
-    timestamp: Date;
-}
-
 interface EditorPreviewPanelProps {
   files: { [key: string]: string };
   onFilesChange: (files: { [key: string]: string }) => void;
@@ -19,41 +13,9 @@ interface EditorPreviewPanelProps {
   initialPrompt: string;
 }
 
-const ConsoleView: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => {
-    const getMessageColor = (type: ConsoleMessage['type']) => {
-        switch (type) {
-            case 'error': return 'text-red-400';
-            case 'warn': return 'text-yellow-400';
-            default: return 'text-gray-300';
-        }
-    };
-
-    return (
-        <div className="h-full bg-[#1e1e1e] font-mono text-sm p-4 overflow-y-auto">
-            {messages.length === 0 ? (
-                 <div className="text-gray-500">Console is empty.</div>
-            ) : (
-                messages.map((msg, index) => (
-                    <div key={index} className={`flex items-start py-1 border-b border-white/10 ${getMessageColor(msg.type)}`}>
-                        <span className="text-gray-500 mr-4">{msg.timestamp.toLocaleTimeString()}</span>
-                        <pre className="whitespace-pre-wrap flex-grow">{msg.message}</pre>
-                    </div>
-                ))
-            )}
-        </div>
-    );
-};
-
 const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesChange, isGeneratingInitial, suggestions, onAddToChat, initialPrompt }) => {
-  const [activeView, setActiveView] = useState<'preview' | 'code' | 'console'>('preview');
-  const [activeFile, setActiveFile] = useState('index.html');
-  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
-
-  const handleConsoleMessage = useCallback((message: ConsoleMessage) => {
-    setConsoleMessages(prev => [...prev, message]);
-  }, []);
-  
-  const clearConsole = useCallback(() => setConsoleMessages([]), []);
+  const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
+  const [activeFile, setActiveFile] = useState('App.js');
   
   const handleCodeChange = (newCode: string) => {
     onFilesChange({ ...files, [activeFile]: newCode });
@@ -61,7 +23,7 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesC
   
   // Ensure activeFile always exists in files
   if (!files[activeFile]) {
-      const firstFile = Object.keys(files)[0] || 'index.html';
+      const firstFile = Object.keys(files)[0] || 'App.js';
       if(activeFile !== firstFile) {
         setActiveFile(firstFile);
       }
@@ -71,14 +33,14 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesC
     if (isGeneratingInitial) {
       return <GeneratingPreview suggestions={suggestions} onAddToChat={onAddToChat} initialPrompt={initialPrompt} />;
     }
-    return <Preview files={files} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />;
+    return <Preview files={files} />;
   };
 
   return (
     <div className="h-full flex flex-col relative bg-[#1e1e1e]">
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center space-x-2">
         <div className="flex space-x-1 bg-black/30 backdrop-blur-md p-1 rounded-full border border-white/10">
-          {['preview', 'code', 'console'].map((view) => (
+          {['preview', 'code'].map((view) => (
             <button
               key={view}
               onClick={() => setActiveView(view as any)}
@@ -117,7 +79,6 @@ const EditorPreviewPanel: React.FC<EditorPreviewPanelProps> = ({ files, onFilesC
               {renderPreview()}
             </div>
         )}
-        {activeView === 'console' && <ConsoleView messages={consoleMessages} />}
       </div>
     </div>
   );

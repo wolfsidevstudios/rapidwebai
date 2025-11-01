@@ -25,26 +25,26 @@ const commands = [
   {
     command: 'todo',
     name: 'To-Do App',
-    description: 'A classic to-do list with Firebase auth and persistence.',
-    prompt: 'A real-time to-do list app with Google authentication and Firebase Firestore for storage, allowing users to add, edit, and delete tasks.',
-  },
-  {
-    command: 'blog',
-    name: 'Blog',
-    description: 'A simple, clean blog with posts and comments.',
-    prompt: 'A personal blog website with a homepage to list all posts, individual pages for each post, and a section for comments. Use a simple design.',
-  },
-  {
-    command: 'portfolio',
-    name: 'Portfolio',
-    description: 'A modern developer portfolio to showcase your projects.',
-    prompt: 'A developer portfolio website with a home section, an about section, a projects section with cards for each project, and a contact form.',
+    description: 'A simple to-do list for iOS and Android.',
+    prompt: 'A simple to-do list app where users can add tasks to a list and mark them as complete by tapping on them.',
   },
   {
     command: 'weather',
     name: 'Weather App',
-    description: 'A weather app that shows the forecast for a city.',
-    prompt: 'A weather application that allows users to search for a city and see the current temperature, humidity, wind speed, and a 5-day forecast.',
+    description: 'Shows the weather for a given city.',
+    prompt: 'A weather app that uses an input field to get a city name and displays the current temperature and weather conditions.',
+  },
+  {
+    command: 'calculator',
+    name: 'Tip Calculator',
+    description: 'Calculates the tip and total for a bill.',
+    prompt: 'A tip calculator that takes a bill amount and a tip percentage, then calculates and displays the tip amount and the total bill.',
+  },
+  {
+    command: 'quote',
+    name: 'Quote of the Day',
+    description: 'Displays a new inspirational quote each day.',
+    prompt: 'An app that fetches a random inspirational quote from an API and displays it on the screen with a button to get a new quote.',
   },
 ];
 
@@ -131,10 +131,10 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
       <div className="flex flex-col items-center justify-center h-full w-full bg-black/10">
         <div className="text-center mb-12">
             <h1 className="text-6xl font-extrabold text-white" style={{textShadow: '0 4px 15px rgba(0,0,0,0.5)'}}>
-                Build Full-Stack Apps with AI
+                Build React Native Apps with AI
             </h1>
             <p className="text-xl text-white/90 mt-4" style={{textShadow: '0 2px 10px rgba(0,0,0,0.5)'}}>
-                Describe the web application you want to build, from a simple component to a full-stack solution.
+                Describe the mobile application you want to build for iOS and Android.
             </p>
         </div>
         <form onSubmit={handleSubmit} className="relative w-full max-w-2xl px-4">
@@ -168,7 +168,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
                 value={prompt}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g., 'A to-do list app' or type '/' for templates"
+                placeholder="e.g., 'A simple counter app' or type '/' for templates"
                 className="w-full h-40 p-6 pl-20 pr-20 text-xl bg-white text-gray-800 placeholder-gray-500 rounded-3xl shadow-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/60 resize-none transition-all"
                 aria-label="Initial prompt input"
               />

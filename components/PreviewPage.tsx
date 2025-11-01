@@ -7,13 +7,9 @@ interface PreviewPageProps {
 }
 
 const PreviewPage: React.FC<PreviewPageProps> = ({ project }) => {
-    // A dummy handler for console messages on the public page, as there's no console UI to display them.
-    const handleConsoleMessage = () => {}; 
-    const clearConsole = () => {};
-
     return (
         <div className="h-screen w-screen bg-white">
-            <Preview files={project.files} onConsoleMessage={handleConsoleMessage} clearConsole={clearConsole} />
+            <Preview files={project.files} />
         </div>
     );
 };
